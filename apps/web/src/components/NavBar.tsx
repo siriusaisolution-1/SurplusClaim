@@ -6,6 +6,7 @@ const links = [
   { href: '/', label: 'Dashboard', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'REVIEWER', 'OPS', 'B2B_CLIENT', 'READ_ONLY'] },
   { href: '/cases', label: 'Cases', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'REVIEWER', 'OPS'] },
   { href: '/triage', label: 'Triage', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'REVIEWER', 'OPS'] },
+  { href: '/portal', label: 'Client Portal', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'REVIEWER', 'OPS', 'B2B_CLIENT'] },
   { href: '/admin', label: 'Admin', roles: ['SUPER_ADMIN', 'TENANT_ADMIN'] }
 ];
 

@@ -118,6 +118,24 @@ interface ChecklistItem {
   conditions?: string;
   type: 'document' | 'form';
   jurisdiction: { state: string; county_code: string; county_name: string };
+  completed?: boolean;
+}
+
+type DocumentStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+interface CaseDocument {
+  id: string;
+  objectKey: string;
+  originalFilename: string;
+  sha256: string;
+  docType?: string | null;
+  aiDocType?: string | null;
+  aiConfidence?: number | null;
+  status: DocumentStatus;
+  reviewerId?: string | null;
+  reviewNote?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
 }
 
 interface TemplateSummary {
@@ -180,6 +198,12 @@ export default function CasesPage() {
   const [communicationError, setCommunicationError] = useState<string | null>(null);
   const [sendAt, setSendAt] = useState('');
   const [communicationHistory, setCommunicationHistory] = useState<CommunicationRecord[]>([]);
+  const [documents, setDocuments] = useState<CaseDocument[]>([]);
+  const [documentError, setDocumentError] = useState<string | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadDocType, setUploadDocType] = useState('');
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -224,6 +248,11 @@ export default function CasesPage() {
     setCommunicationPreview(null);
     setCommunicationStatus(null);
     setCommunicationError(null);
+  }, [selectedRef, accessToken]);
+
+  useEffect(() => {
+    if (!selectedRef || !accessToken) return;
+    void fetchDocuments(selectedRef);
   }, [selectedRef, accessToken]);
 
   const fetchJurisdictions = async () => {
@@ -356,6 +385,115 @@ export default function CasesPage() {
       setChecklistItems([]);
     } finally {
       setLoadingRules(false);
+    }
+  };
+
+  const fetchDocuments = async (caseRef: string) => {
+    if (!accessToken) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/cases/${caseRef}/documents`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+
+      if (!response.ok) {
+        throw new Error('Unable to load documents');
+      }
+
+      const payload = await response.json();
+      setDocuments(payload.documents ?? []);
+      if (payload.checklist?.items) {
+        setChecklistItems(payload.checklist.items);
+      }
+    } catch (err: any) {
+      setDocumentError(err.message ?? 'Unable to load documents');
+    }
+  };
+
+  const handleDocumentUpload = async () => {
+    if (!selectedRef || !accessToken) {
+      setDocumentError('Select a case before uploading');
+      return;
+    }
+    if (!uploadFile) {
+      setDocumentError('Select a document to upload');
+      return;
+    }
+
+    setUploadingDoc(true);
+    setDocumentError(null);
+    setUploadProgress(0);
+
+    const formData = new FormData();
+    formData.append('file', uploadFile);
+    if (uploadDocType) {
+      formData.append('docType', uploadDocType);
+    }
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_BASE_URL}/cases/${selectedRef}/documents/upload`);
+        xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setUploadProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const payload = JSON.parse(xhr.responseText);
+              setUploadProgress(100);
+              setUploadFile(null);
+              setUploadDocType('');
+              setDocuments((prev) => [payload.document, ...prev.filter((doc) => doc.id !== payload.document.id)]);
+              if (payload.checklist?.items) {
+                setChecklistItems(payload.checklist.items);
+              }
+              resolve();
+            } catch (err) {
+              reject(err);
+            }
+          } else {
+            reject(new Error(xhr.statusText || 'Upload failed'));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error('Upload failed'));
+        xhr.send(formData);
+      });
+    } catch (err: any) {
+      setDocumentError(err.message ?? 'Upload failed');
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleReview = async (documentId: string, status: DocumentStatus, note?: string, docType?: string) => {
+    if (!selectedRef || !accessToken) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/cases/${selectedRef}/documents/${documentId}/review`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ status, note: note ?? undefined, docType: docType ?? undefined })
+      });
+
+      if (!response.ok) {
+        throw new Error('Unable to submit review');
+      }
+
+      const payload = await response.json();
+      setDocuments((prev) => prev.map((doc) => (doc.id === documentId ? payload.document : doc)));
+      if (payload.checklist?.items) {
+        setChecklistItems(payload.checklist.items);
+      }
+    } catch (err: any) {
+      setDocumentError(err.message ?? 'Unable to review document');
     }
   };
 
@@ -541,6 +679,8 @@ export default function CasesPage() {
   if (!user) return <div className="main-shell" />;
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const requiredDocs = checklistItems.filter((item) => item.type === 'document');
+  const completedDocs = requiredDocs.filter((item) => item.completed).length;
 
   return (
     <div className="main-shell">
@@ -737,115 +877,240 @@ export default function CasesPage() {
                   style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem', marginTop: '1.25rem' }}
                 >
                   <div>
-                    <h4>Checklist</h4>
+                    <h4>Checklist progress</h4>
                     {loadingRules && <p>Loading jurisdiction rules...</p>}
                     {rulesError && <p style={{ color: '#f87171' }}>{rulesError}</p>}
                     {!loadingRules && !rulesError && (
-                      <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
-                        {checklistItems.map((item) => (
+                      <>
+                        <div style={{ color: '#9ca3af', marginBottom: '0.35rem' }}>
+                          {completedDocs} / {requiredDocs.length || 1} required documents received
+                        </div>
+                        <div
+                          style={{
+                            background: '#0b1320',
+                            borderRadius: '6px',
+                            overflow: 'hidden',
+                            marginBottom: '0.5rem'
+                          }}
+                        >
                           <div
-                            key={item.id}
-                            style={{ borderBottom: '1px solid #1f2937', padding: '0.5rem 0' }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <div>
-                                <strong>{item.title}</strong>
-                                {item.description && (
-                                  <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>{item.description}</div>
-                                )}
-                                {item.conditions && (
-                                  <div style={{ color: '#c084fc', fontSize: '0.85rem' }}>{item.conditions}</div>
-                                )}
+                            style={{
+                              width: `${Math.round((completedDocs / (requiredDocs.length || 1)) * 100)}%`,
+                              height: '10px',
+                              background: '#3b82f6',
+                              transition: 'width 0.2s ease'
+                            }}
+                          />
+                        </div>
+                        <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                          {checklistItems.map((item) => (
+                            <div
+                              key={item.id}
+                              style={{ borderBottom: '1px solid #1f2937', padding: '0.5rem 0' }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                  <strong>{item.title}</strong>
+                                  {item.description && (
+                                    <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>{item.description}</div>
+                                  )}
+                                  {item.conditions && (
+                                    <div style={{ color: '#c084fc', fontSize: '0.85rem' }}>{item.conditions}</div>
+                                  )}
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                  <span className="tag">{item.type === 'form' ? 'Form' : 'Document'}</span>
+                                  <span
+                                    className="tag"
+                                    style={{ background: item.completed ? '#10b981' : '#6b7280' }}
+                                  >
+                                    {item.completed ? 'Complete' : 'Pending'}
+                                  </span>
+                                </div>
                               </div>
-                              <span className="tag">{item.type === 'form' ? 'Form' : 'Document'}</span>
                             </div>
-                          </div>
-                        ))}
-                        {checklistItems.length === 0 && <p style={{ color: '#9ca3af' }}>No checklist items</p>}
-                      </div>
+                          ))}
+                          {checklistItems.length === 0 && <p style={{ color: '#9ca3af' }}>No checklist items</p>}
+                        </div>
+                      </>
                     )}
                   </div>
 
                   <div>
-                    <h4>Procedural Metadata</h4>
-                    {ruleDetails ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <div>
-                          <strong>Submission channels:</strong>
-                          <div style={{ color: '#9ca3af' }}>
-                            {ruleDetails.procedural.submission_channels.join(', ')}
+                    <h4>Documents & reviews</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                      <input type="file" onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} />
+                      <input
+                        className="input"
+                        placeholder="Optional doc type override"
+                        value={uploadDocType}
+                        onChange={(e) => setUploadDocType(e.target.value)}
+                      />
+                      <button className="button" onClick={handleDocumentUpload} disabled={uploadingDoc}>
+                        {uploadingDoc ? 'Uploading…' : 'Upload document'}
+                      </button>
+                      {uploadingDoc && (
+                        <div style={{ background: '#0b1320', borderRadius: '6px', overflow: 'hidden' }}>
+                          <div
+                            style={{
+                              width: `${uploadProgress}%`,
+                              height: '8px',
+                              background: '#10b981',
+                              transition: 'width 0.2s ease'
+                            }}
+                          />
+                        </div>
+                      )}
+                      {documentError && <span style={{ color: '#f87171' }}>{documentError}</span>}
+                    </div>
+                    <div
+                      style={{
+                        maxHeight: '320px',
+                        overflowY: 'auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      {documents.map((doc) => (
+                        <div key={doc.id} style={{ border: '1px solid #1f2937', borderRadius: '8px', padding: '0.5rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                              <strong>{doc.originalFilename}</strong>
+                              <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>{doc.objectKey}</div>
+                            </div>
+                            <span
+                              className="tag"
+                              style={{
+                                background:
+                                  doc.status === 'APPROVED'
+                                    ? '#10b981'
+                                    : doc.status === 'REJECTED'
+                                      ? '#ef4444'
+                                      : '#6b7280'
+                              }}
+                            >
+                              {doc.status}
+                            </span>
+                          </div>
+                          <div style={{ color: '#9ca3af', fontSize: '0.9rem', marginTop: '0.35rem' }}>
+                            SHA256: {doc.sha256}
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.5rem', color: '#e5e7eb', marginTop: '0.35rem' }}>
+                            <span>Doc type: {doc.docType ?? doc.aiDocType ?? 'Unlabeled'}</span>
+                            {doc.aiConfidence && <span>AI confidence: {(doc.aiConfidence * 100).toFixed(1)}%</span>}
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
+                            <button
+                              className="button"
+                              onClick={() =>
+                                handleReview(doc.id, 'APPROVED', undefined, doc.docType ?? doc.aiDocType ?? undefined)
+                              }
+                            >
+                              Approve
+                            </button>
+                            <button
+                              className="button"
+                              style={{ background: '#ef4444' }}
+                              onClick={() => {
+                                const note = prompt('Optional rejection note');
+                                void handleReview(
+                                  doc.id,
+                                  'REJECTED',
+                                  note ?? undefined,
+                                  doc.docType ?? doc.aiDocType ?? undefined
+                                );
+                              }}
+                            >
+                              Reject
+                            </button>
                           </div>
                         </div>
-                        {ruleDetails.procedural.deadlines.length > 0 && (
-                          <div>
-                            <strong>Deadlines</strong>
-                            <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#9ca3af' }}>
-                              {ruleDetails.procedural.deadlines.map((deadline) => (
-                                <li key={deadline.name}>
-                                  <div>
-                                    {deadline.name}: {deadline.timeline}
-                                  </div>
-                                  {deadline.notes && (
-                                    <div style={{ fontSize: '0.9rem' }}>{deadline.notes}</div>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        {ruleDetails.procedural.addresses.length > 0 && (
-                          <div>
-                            <strong>Submission addresses</strong>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', color: '#9ca3af' }}>
-                              {ruleDetails.procedural.addresses.map((address) => (
-                                <div key={address.name}>
-                                  <div>{address.name}</div>
-                                  {address.attention && <div>{address.attention}</div>}
-                                  <div>{address.line1}</div>
-                                  {address.line2 && <div>{address.line2}</div>}
-                                  <div>
-                                    {address.city}, {address.state} {address.postal_code}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {ruleDetails.allowed_email_templates.length > 0 && (
-                          <div>
-                            <strong>Allowed email templates</strong>
-                            <div style={{ color: '#9ca3af' }}>
-                              {ruleDetails.allowed_email_templates.map((tpl) => tpl.name).join(', ')}
-                            </div>
-                          </div>
-                        )}
-                        <div>
-                          <strong>Fees</strong>
-                          <div style={{ color: '#9ca3af' }}>
-                            {ruleDetails.fee_schedule.min_fee_cents
-                              ? `$${(ruleDetails.fee_schedule.min_fee_cents / 100).toFixed(2)} minimum`
-                              : 'No published minimum'}
-                          </div>
-                          <div style={{ color: '#9ca3af' }}>
-                            {ruleDetails.fee_schedule.max_fee_cents
-                              ? `$${(ruleDetails.fee_schedule.max_fee_cents / 100).toFixed(2)} cap`
-                              : 'No published cap'}
-                          </div>
-                        </div>
-                        <div>
-                          <strong>Feature flag:</strong>{' '}
-                          <span className="tag" style={{ background: ruleDetails.enabled ? '#10b981' : '#f97316' }}>
-                            {ruleDetails.enabled ? 'Enabled' : 'Disabled'}
-                          </span>
-                          {ruleDetails.feature_flags.notes && (
-                            <div style={{ color: '#9ca3af' }}>{ruleDetails.feature_flags.notes}</div>
-                          )}
+                      ))}
+                      {documents.length === 0 && <p style={{ color: '#9ca3af' }}>No documents uploaded yet.</p>}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '1.25rem' }}>
+                  <h4>Procedural Metadata</h4>
+                  {ruleDetails ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div>
+                        <strong>Submission channels:</strong>
+                        <div style={{ color: '#9ca3af' }}>
+                          {ruleDetails.procedural.submission_channels.join(', ')}
                         </div>
                       </div>
-                    ) : (
-                      <p style={{ color: '#9ca3af' }}>Select a jurisdiction with available rules.</p>
-                    )}
-                  </div>
+                      {ruleDetails.procedural.deadlines.length > 0 && (
+                        <div>
+                          <strong>Deadlines</strong>
+                          <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#9ca3af' }}>
+                            {ruleDetails.procedural.deadlines.map((deadline) => (
+                              <li key={deadline.name}>
+                                <div>
+                                  {deadline.name}: {deadline.timeline}
+                                </div>
+                                {deadline.notes && (
+                                  <div style={{ fontSize: '0.9rem' }}>{deadline.notes}</div>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {ruleDetails.procedural.addresses.length > 0 && (
+                        <div>
+                          <strong>Submission addresses</strong>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', color: '#9ca3af' }}>
+                            {ruleDetails.procedural.addresses.map((address) => (
+                              <div key={address.name}>
+                                <div>{address.name}</div>
+                                {address.attention && <div>{address.attention}</div>}
+                                <div>{address.line1}</div>
+                                {address.line2 && <div>{address.line2}</div>}
+                                <div>
+                                  {address.city}, {address.state} {address.postal_code}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {ruleDetails.allowed_email_templates.length > 0 && (
+                        <div>
+                          <strong>Allowed email templates</strong>
+                          <div style={{ color: '#9ca3af' }}>
+                            {ruleDetails.allowed_email_templates.map((tpl) => tpl.name).join(', ')}
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <strong>Fees</strong>
+                        <div style={{ color: '#9ca3af' }}>
+                          {ruleDetails.fee_schedule.min_fee_cents
+                            ? `$${(ruleDetails.fee_schedule.min_fee_cents / 100).toFixed(2)} minimum`
+                            : 'No published minimum'}
+                        </div>
+                        <div style={{ color: '#9ca3af' }}>
+                          {ruleDetails.fee_schedule.max_fee_cents
+                            ? `$${(ruleDetails.fee_schedule.max_fee_cents / 100).toFixed(2)} cap`
+                            : 'No published cap'}
+                        </div>
+                      </div>
+                      <div>
+                        <strong>Feature flag:</strong>{' '}
+                        <span className="tag" style={{ background: ruleDetails.enabled ? '#10b981' : '#f97316' }}>
+                          {ruleDetails.enabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                        {ruleDetails.feature_flags.notes && (
+                          <div style={{ color: '#9ca3af' }}>{ruleDetails.feature_flags.notes}</div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ color: '#9ca3af' }}>Select a jurisdiction with available rules.</p>
+                  )}
                 </div>
 
                 <div style={{ marginTop: '1.25rem' }}>
