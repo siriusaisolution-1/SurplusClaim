@@ -40,6 +40,16 @@ async function seedTenants() {
   const tenantA = await prisma.tenant.create({ data: { name: 'Tenant A' } });
   const tenantB = await prisma.tenant.create({ data: { name: 'Tenant B' } });
 
+  const adminA = await prisma.user.create({
+    data: {
+      tenantId: tenantA.id,
+      email: 'admin@tenant-a.test',
+      fullName: 'Admin A',
+      role: 'TENANT_ADMIN',
+      passwordHash: hashPasswordForStorage('PasswordAdmin1!')
+    }
+  });
+
   const reviewerA = await prisma.user.create({
     data: {
       tenantId: tenantA.id,
@@ -80,7 +90,7 @@ async function seedTenants() {
     }
   });
 
-  return { tenantA, tenantB, reviewerA, adminB, caseA };
+  return { tenantA, tenantB, reviewerA, adminA, adminB, caseA };
 }
 
 async function main() {
@@ -138,6 +148,49 @@ async function main() {
 
   const loginAuditEntries = await prisma.auditLog.findMany({ where: { action: 'LOGIN_SUCCESS' } });
   assert.ok(loginAuditEntries.length >= 1);
+
+  const adminLogin = await request(server)
+    .post('/auth/login')
+    .send({ tenantId: seed.tenantA.id, email: seed.adminA.email, password: 'PasswordAdmin1!' })
+    .expect(201);
+
+  const adminToken = adminLogin.body.accessToken;
+
+  const verifyResponse = await request(server)
+    .get('/audit/verify')
+    .set('Authorization', `Bearer ${adminToken}`)
+    .expect(200);
+
+  assert.strictEqual(verifyResponse.body.isValid, true);
+
+  const exportResponse = await request(server)
+    .get('/audit/export')
+    .query({ case_ref: 'CASE-A-001' })
+    .set('Authorization', `Bearer ${adminToken}`)
+    .expect(200);
+
+  assert.ok(exportResponse.text.includes('CASE_VIEWED'));
+
+  const earliestAudit = await prisma.auditLog.findFirst({
+    where: { tenantId: seed.tenantA.id },
+    orderBy: { createdAt: 'asc' }
+  });
+
+  assert.ok(earliestAudit, 'Expected at least one audit entry to tamper with');
+
+  if (earliestAudit) {
+    await prisma.$executeRawUnsafe(
+      `UPDATE "AuditLog" SET metadata = '{"tampered":true}' WHERE "id" = '${earliestAudit.id}'`
+    );
+  }
+
+  const tamperedVerifyResponse = await request(server)
+    .get('/audit/verify')
+    .set('Authorization', `Bearer ${adminToken}`)
+    .expect(200);
+
+  assert.strictEqual(tamperedVerifyResponse.body.isValid, false);
+  assert.ok(tamperedVerifyResponse.body.brokenRecord);
 
   console.log('Integration test completed successfully');
   await app.close();

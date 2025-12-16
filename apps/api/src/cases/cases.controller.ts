@@ -24,6 +24,15 @@ export class CasesController {
       throw new NotFoundException('Case not found');
     }
 
+    await this.auditService.logAction({
+      tenantId: user.tenantId,
+      actorId: user.sub,
+      caseRef,
+      caseId: caseRecord.id,
+      action: 'CASE_VIEWED',
+      metadata: { viewerRole: user.role }
+    });
+
     return {
       id: caseRecord.id,
       tenantId: caseRecord.tenantId,

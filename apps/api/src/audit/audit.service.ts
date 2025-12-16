@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { randomBytes, createHash } from 'node:crypto';
+import { AuditEngine, VerificationRange, VerificationResult } from '@surplus/audit';
 
 import { prisma } from '../prisma/prisma.client';
 
 @Injectable()
 export class AuditService {
   private readonly logger = new Logger(AuditService.name);
+  private readonly engine = new AuditEngine(prisma);
 
   async logAction(params: {
     tenantId: string;
@@ -15,25 +16,30 @@ export class AuditService {
     caseRef?: string;
     metadata?: Record<string, unknown>;
   }) {
-    const hash = createHash('sha256')
-      .update(`${params.tenantId}:${params.action}:${Date.now()}:${randomBytes(16).toString('hex')}`)
-      .digest('hex');
-
     try {
-      await prisma.auditLog.create({
-        data: {
-          tenantId: params.tenantId,
-          caseId: params.caseId ?? null,
-          caseRef: params.caseRef ?? 'AUTH',
-          actorId: params.actorId ?? null,
-          action: params.action,
-          metadata: params.metadata ?? {},
-          hash,
-          prevHash: null
-        }
+      await this.engine.append({
+        tenantId: params.tenantId,
+        eventType: params.action,
+        actor: params.actorId ?? null,
+        payload: params.metadata ?? {},
+        caseRef: params.caseRef,
+        caseId: params.caseId ?? null
       });
     } catch (error) {
       this.logger.error('Failed to append to audit log', error as Error);
     }
+  }
+
+  async verifyChain(tenantId: string, range?: VerificationRange): Promise<VerificationResult> {
+    return this.engine.verifyChain(tenantId, range);
+  }
+
+  async exportCaseAudit(tenantId: string, caseRef: string): Promise<string> {
+    const records = await prisma.auditLog.findMany({
+      where: { tenantId, caseRef },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]
+    });
+
+    return records.map((record) => JSON.stringify(record)).join('\n');
   }
 }
