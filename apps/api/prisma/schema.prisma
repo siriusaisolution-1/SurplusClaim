@@ -170,8 +170,15 @@ model Document {
   caseId    String
   caseRef   String
   objectKey String
+  originalFilename String
   sha256    String
   docType   String?
+  aiDocType String?
+  aiConfidence Float?
+  status    DocumentStatus @default(PENDING)
+  reviewerId String?
+  reviewedAt DateTime?
+  reviewNote String?
   createdAt DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
@@ -179,6 +186,12 @@ model Document {
 
   @@index([tenantId, caseRef])
   @@unique([tenantId, objectKey])
+}
+
+enum DocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model Consent {

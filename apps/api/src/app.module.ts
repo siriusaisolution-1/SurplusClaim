@@ -18,6 +18,8 @@ import { CommunicationsService } from './communications/communications.service';
 import { CommunicationsController } from './communications/communications.controller';
 import { ConsentController } from './consent/consent.controller';
 import { ConsentService } from './consent/consent.service';
+import { DocumentsController } from './documents/documents.controller';
+import { DocumentsService } from './documents/documents.service';
 
 @Module({
   imports: [ConnectorsModule],
@@ -29,7 +31,8 @@ import { ConsentService } from './consent/consent.service';
     AuditController,
     RulesController,
     CommunicationsController,
-    ConsentController
+    ConsentController,
+    DocumentsController
   ],
   providers: [
     AuditService,
@@ -39,6 +42,7 @@ import { ConsentService } from './consent/consent.service';
     RulesService,
     CommunicationsService,
     ConsentService,
+    DocumentsService,
     {
       provide: APP_GUARD,
       useClass: AuthGuard
