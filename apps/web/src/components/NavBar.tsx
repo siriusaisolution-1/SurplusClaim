@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth-context';
 const links = [
   { href: '/', label: 'Dashboard', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'REVIEWER', 'OPS', 'B2B_CLIENT', 'READ_ONLY'] },
   { href: '/cases', label: 'Cases', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'REVIEWER', 'OPS'] },
+  { href: '/triage', label: 'Triage', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'REVIEWER', 'OPS'] },
   { href: '/admin', label: 'Admin', roles: ['SUPER_ADMIN', 'TENANT_ADMIN'] }
 ];
 

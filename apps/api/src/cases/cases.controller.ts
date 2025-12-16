@@ -3,7 +3,13 @@ import { CaseStatus } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { CurrentUser, Roles } from '../auth/auth.decorators';
-import { CaseTransitionInput, CasesService, CreateCaseInput } from './cases.service';
+import {
+  CaseTransitionInput,
+  CasesService,
+  ConfirmTriageInput,
+  CreateCaseInput,
+  TriageSuggestInput
+} from './cases.service';
 
 @Controller('cases')
 export class CasesController {
@@ -15,6 +21,7 @@ export class CasesController {
     @CurrentUser() user: any,
     @Query('status') status?: CaseStatus,
     @Query('search') search?: string,
+    @Query('needsTriage') needsTriage?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string
   ) {
@@ -22,6 +29,7 @@ export class CasesController {
     const response = await this.casesService.listCases(user.tenantId, {
       status: parsedStatus,
       search,
+      needsTriage: needsTriage === 'true',
       page: page ? parseInt(page, 10) : undefined,
       pageSize: pageSize ? parseInt(pageSize, 10) : undefined
     });
@@ -117,5 +125,29 @@ export class CasesController {
     const updatedCase = await this.casesService.transitionCase(user.tenantId, user.sub, caseRef, body);
 
     return updatedCase;
+  }
+
+  @Post(':caseRef/triage/suggest')
+  @Roles('TENANT_ADMIN', 'REVIEWER', 'OPS')
+  async suggestTier(
+    @Param('caseRef') caseRef: string,
+    @Body() body: TriageSuggestInput,
+    @CurrentUser() user: any
+  ) {
+    const suggestion = await this.casesService.suggestTier(user.tenantId, user.sub, caseRef, body);
+
+    return suggestion;
+  }
+
+  @Post(':caseRef/triage/confirm')
+  @Roles('TENANT_ADMIN', 'REVIEWER', 'OPS')
+  async confirmTier(
+    @Param('caseRef') caseRef: string,
+    @Body() body: ConfirmTriageInput,
+    @CurrentUser() user: any
+  ) {
+    const confirmation = await this.casesService.confirmTier(user.tenantId, user.sub, caseRef, body);
+
+    return confirmation;
   }
 }
