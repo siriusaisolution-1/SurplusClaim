@@ -21,11 +21,49 @@ export type ListCasesParams = {
   search?: string;
   page?: number;
   pageSize?: number;
+  needsTriage?: boolean;
 };
 
 export type CaseTransitionInput = {
   toState: CaseStatus;
   reason?: string;
+};
+
+type TriagedTier = 'TIER_A' | 'TIER_B' | 'TIER_C';
+
+export type TriageSuggestInput = {
+  context?: string;
+  signals?: string[];
+  probateFlag?: boolean;
+  heirsFlag?: boolean;
+  titleIssueFlag?: boolean;
+};
+
+export type TriageSuggestion = {
+  tier: TriagedTier;
+  mappedTierLevel: TierLevel;
+  rationale: string[];
+  confidence: number;
+  escalates: boolean;
+  signalsUsed: string[];
+};
+
+export type ConfirmTriageInput = {
+  tier: TriagedTier;
+  reviewerId?: string | null;
+  rationale?: string[];
+  notes?: string;
+  partnerHandoff?: {
+    partnerName: string;
+    contact: string;
+    summary: string;
+  };
+};
+
+const tierMapping: Record<TriagedTier, { level: TierLevel; label: string }> = {
+  TIER_A: { level: TierLevel.LOW, label: 'Tier A - simple' },
+  TIER_B: { level: TierLevel.MEDIUM, label: 'Tier B - intermediate' },
+  TIER_C: { level: TierLevel.HIGH, label: 'Tier C - escalation' }
 };
 
 const allowedTransitions: Record<CaseStatus, CaseStatus[]> = {
@@ -74,6 +112,66 @@ export class CasesService {
     return allowedTransitions[status] ?? [];
   }
 
+  private deriveTriageSuggestion(
+    caseRecord: any,
+    input: TriageSuggestInput
+  ): TriageSuggestion {
+    const rationale: string[] = [];
+    const signalsUsed = [...(input.signals ?? [])];
+    const context = input.context?.toLowerCase() ?? '';
+    let hasEscalationTrigger = false;
+
+    const escalatedSignals = ['probate', 'heir', 'heirs', 'title', 'dispute', 'estate', 'lawsuit'];
+    if (input.probateFlag) {
+      rationale.push('Probate flag detected');
+      signalsUsed.push('probate_flag');
+      hasEscalationTrigger = true;
+    }
+    if (input.heirsFlag) {
+      rationale.push('Heirs or next-of-kin investigation required');
+      signalsUsed.push('heirs_flag');
+      hasEscalationTrigger = true;
+    }
+    if (input.titleIssueFlag) {
+      rationale.push('Title issue noted by intake');
+      signalsUsed.push('title_issue_flag');
+      hasEscalationTrigger = true;
+    }
+
+    const metadataString = JSON.stringify(caseRecord.metadata ?? {}).toLowerCase();
+    if (escalatedSignals.some((keyword) => context.includes(keyword) || metadataString.includes(keyword))) {
+      rationale.push('Escalation keywords detected (probate/heirs/title dispute)');
+      hasEscalationTrigger = true;
+    }
+
+    let tier: TriagedTier = 'TIER_A';
+    if (hasEscalationTrigger) {
+      tier = 'TIER_C';
+    } else if (rationale.length >= 1) {
+      tier = 'TIER_B';
+    }
+
+    const mappedTierLevel = tierMapping[tier].level;
+    const confidence = tier === 'TIER_A' ? 0.58 : tier === 'TIER_B' ? 0.76 : 0.91;
+
+    if (tier === 'TIER_A') {
+      rationale.push('Defaulted to Tier A due to no escalation signals');
+    } else if (tier === 'TIER_B') {
+      rationale.push('Intermediate handling recommended before client contact');
+    } else {
+      rationale.push('Tier C requires escalation to partner');
+    }
+
+    return {
+      tier,
+      mappedTierLevel,
+      rationale,
+      confidence,
+      escalates: tier === 'TIER_C',
+      signalsUsed: Array.from(new Set(signalsUsed))
+    };
+  }
+
   async findByCaseRef(tenantId: string, caseRef: string) {
     return prisma.case.findFirst({
       where: { tenantId, caseRef },
@@ -88,6 +186,7 @@ export class CasesService {
     const where = {
       tenantId,
       ...(params.status ? { status: params.status } : {}),
+      ...(params.needsTriage ? { tierConfirmed: null } : {}),
       ...(params.search
         ? { caseRef: { contains: params.search, mode: 'insensitive' as const } }
         : {})
@@ -157,6 +256,211 @@ export class CasesService {
     });
 
     return createdCase;
+  }
+
+  async suggestTier(
+    tenantId: string,
+    actorId: string,
+    caseRef: string,
+    input: TriageSuggestInput
+  ) {
+    const caseRecord = await this.findByCaseRef(tenantId, caseRef);
+
+    if (!caseRecord) {
+      throw new NotFoundException('Case not found');
+    }
+
+    const suggestion = this.deriveTriageSuggestion(caseRecord, input);
+
+    const updatedCase = await prisma.$transaction(async (tx) => {
+      const record = await tx.case.update({
+        where: { id: caseRecord.id },
+        data: { tierSuggested: suggestion.mappedTierLevel }
+      });
+
+      await tx.caseEvent.create({
+        data: {
+          tenantId,
+          caseId: record.id,
+          caseRef: record.caseRef,
+          type: 'TRIAGE_SUGGESTED',
+          payload: {
+            tier: suggestion.tier,
+            mappedTierLevel: suggestion.mappedTierLevel,
+            rationale: suggestion.rationale,
+            confidence: suggestion.confidence,
+            signals: suggestion.signalsUsed,
+            suggestedBy: 'triage-engine'
+          }
+        }
+      });
+
+      return record;
+    });
+
+    await this.auditService.logAction({
+      tenantId,
+      actorId,
+      caseId: updatedCase.id,
+      caseRef: updatedCase.caseRef,
+      action: 'TRIAGE_SUGGESTED',
+      metadata: {
+        tier: suggestion.tier,
+        mappedTierLevel: suggestion.mappedTierLevel,
+        rationale: suggestion.rationale,
+        confidence: suggestion.confidence,
+        signals: suggestion.signalsUsed,
+        suggestedBy: 'triage-engine'
+      }
+    });
+
+    return {
+      caseRef: updatedCase.caseRef,
+      tierSuggested: suggestion.tier,
+      mappedTierLevel: suggestion.mappedTierLevel,
+      rationale: suggestion.rationale,
+      confidence: suggestion.confidence,
+      escalates: suggestion.escalates
+    };
+  }
+
+  async confirmTier(
+    tenantId: string,
+    actorId: string,
+    caseRef: string,
+    input: ConfirmTriageInput
+  ) {
+    const tierMeta = tierMapping[input.tier];
+    if (!tierMeta) {
+      throw new BadRequestException('Invalid tier selection');
+    }
+
+    if (input.tier === 'TIER_C' && !input.partnerHandoff) {
+      throw new BadRequestException('Partner handoff is required for Tier C escalations');
+    }
+
+    const caseRecord = await this.findByCaseRef(tenantId, caseRef);
+
+    if (!caseRecord) {
+      throw new NotFoundException('Case not found');
+    }
+
+    const shouldEscalate = input.tier === 'TIER_C' && caseRecord.status !== CaseStatus.ESCALATED;
+
+    const updatedCase = await prisma.$transaction(async (tx) => {
+      const record = await tx.case.update({
+        where: { id: caseRecord.id },
+        data: {
+          tierSuggested: tierMeta.level,
+          tierConfirmed: tierMeta.level,
+          assignedReviewerId: input.reviewerId ?? caseRecord.assignedReviewerId ?? null,
+          status: shouldEscalate ? CaseStatus.ESCALATED : caseRecord.status
+        },
+        include: { assignedReviewer: true }
+      });
+
+      await tx.caseEvent.create({
+        data: {
+          tenantId,
+          caseId: record.id,
+          caseRef: record.caseRef,
+          type: 'TRIAGE_CONFIRMED',
+          payload: {
+            tier: input.tier,
+            mappedTierLevel: tierMeta.level,
+            rationale: input.rationale ?? [],
+            notes: input.notes ?? null,
+            reviewerId: record.assignedReviewerId
+          }
+        }
+      });
+
+      if (input.tier === 'TIER_C' && input.partnerHandoff) {
+        await tx.caseEvent.create({
+          data: {
+            tenantId,
+            caseId: record.id,
+            caseRef: record.caseRef,
+            type: 'PARTNER_HANDOFF',
+            payload: {
+              ...input.partnerHandoff,
+              triggeredBy: actorId,
+              reason: 'Tier C escalation'
+            }
+          }
+        });
+      }
+
+      if (shouldEscalate) {
+        await tx.caseEvent.create({
+          data: {
+            tenantId,
+            caseId: record.id,
+            caseRef: record.caseRef,
+            type: 'CASE_STATUS_CHANGED',
+            payload: {
+              from: caseRecord.status,
+              to: CaseStatus.ESCALATED,
+              reason: 'Tier C escalation'
+            }
+          }
+        });
+      }
+
+      return record;
+    });
+
+    await this.auditService.logAction({
+      tenantId,
+      actorId,
+      caseId: updatedCase.id,
+      caseRef: updatedCase.caseRef,
+      action: 'TRIAGE_CONFIRMED',
+      metadata: {
+        tier: input.tier,
+        mappedTierLevel: tierMeta.level,
+        rationale: input.rationale ?? [],
+        notes: input.notes ?? null,
+        reviewerId: updatedCase.assignedReviewerId
+      }
+    });
+
+    if (input.tier === 'TIER_C' && input.partnerHandoff) {
+      await this.auditService.logAction({
+        tenantId,
+        actorId,
+        caseId: updatedCase.id,
+        caseRef: updatedCase.caseRef,
+        action: 'PARTNER_HANDOFF_RECORDED',
+        metadata: {
+          partnerName: input.partnerHandoff.partnerName,
+          contact: input.partnerHandoff.contact,
+          summary: input.partnerHandoff.summary,
+          reason: 'Tier C escalation'
+        }
+      });
+    }
+
+    if (shouldEscalate) {
+      await this.auditService.logAction({
+        tenantId,
+        actorId,
+        caseId: updatedCase.id,
+        caseRef: updatedCase.caseRef,
+        action: 'CASE_TRANSITION',
+        metadata: {
+          from: caseRecord.status,
+          to: CaseStatus.ESCALATED,
+          reason: 'Tier C escalation'
+        }
+      });
+    }
+
+    return {
+      case: updatedCase,
+      allowedTransitions: this.getAllowedTransitions(updatedCase.status),
+      escalated: shouldEscalate
+    };
   }
 
   async transitionCase(

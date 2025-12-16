@@ -22,6 +22,16 @@ const CASE_STATUSES = [
 
 type CaseStatus = (typeof CASE_STATUSES)[number];
 
+const TIER_LABELS: Record<string, string> = {
+  LOW: 'Tier A (simple)',
+  MEDIUM: 'Tier B (intermediate)',
+  HIGH: 'Tier C (escalation)',
+  ENTERPRISE: 'Tier C (escalation)',
+  TIER_A: 'Tier A (simple)',
+  TIER_B: 'Tier B (intermediate)',
+  TIER_C: 'Tier C (escalation)'
+};
+
 interface CaseSummary {
   id: string;
   caseRef: string;
@@ -109,6 +119,11 @@ interface ChecklistItem {
   type: 'document' | 'form';
   jurisdiction: { state: string; county_code: string; county_name: string };
 }
+
+const formatTierLabel = (tier?: string | null) => {
+  if (!tier) return 'Unassigned';
+  return TIER_LABELS[tier] ?? tier;
+};
 
 export default function CasesPage() {
   const { user, loading, accessToken } = useAuth();
@@ -415,7 +430,7 @@ export default function CasesPage() {
                       <td>
                         <span className="tag">{item.status}</span>
                       </td>
-                      <td>{item.tierConfirmed ?? item.tierSuggested}</td>
+                      <td>{formatTierLabel(item.tierConfirmed ?? item.tierSuggested)}</td>
                       <td>{item.assignedReviewer?.email ?? 'Unassigned'}</td>
                     </tr>
                   ))}
@@ -446,7 +461,7 @@ export default function CasesPage() {
                     <h3 style={{ margin: 0 }}>{selectedCase.case.caseRef}</h3>
                     <p style={{ color: '#9ca3af', margin: 0 }}>
                       Status: <strong>{selectedCase.case.status}</strong> · Tier:{' '}
-                      {selectedCase.case.tierConfirmed ?? selectedCase.case.tierSuggested}
+                      {formatTierLabel(selectedCase.case.tierConfirmed ?? selectedCase.case.tierSuggested)}
                     </p>
                     <p style={{ color: '#9ca3af', margin: 0 }}>
                       Reviewer: {selectedCase.case.reviewer?.email ?? 'Unassigned'}
