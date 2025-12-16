@@ -1,3 +1,5 @@
+import os
+
 BOT_NAME = "surplus_scraper"
 
 SPIDER_MODULES = ["surplus_scraper.spiders"]
@@ -20,3 +22,14 @@ PLAYWRIGHT_BROWSER_TYPE = "chromium"
 PLAYWRIGHT_LAUNCH_OPTIONS = {"headless": True}
 
 LOG_LEVEL = "INFO"
+
+ITEM_PIPELINES = {
+    "surplus_scraper.pipelines.NormalizedCaseValidationPipeline": 300,
+}
+
+FEEDS = {
+    os.environ.get("SCRAPY_FEED_URI", "./output/%(name)s/%(time)s.json"): {
+        "format": "json",
+        "overwrite": False,
+    }
+}
