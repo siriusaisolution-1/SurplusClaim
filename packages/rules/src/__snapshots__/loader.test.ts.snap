@@ -1,0 +1,66 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ChecklistGenerator > produces a stable checklist for a given case context 1`] = `
+[
+  {
+    "description": "Identification for the claimant or authorized representative.",
+    "id": "claimant-id",
+    "jurisdiction": {
+      "county_code": "FULTON",
+      "county_name": "Fulton County",
+      "state": "GA",
+    },
+    "required": true,
+    "title": "Government-issued photo ID",
+    "type": "document",
+  },
+  {
+    "description": "Deed, tax bill, or other evidence that ties the claimant to the property.",
+    "id": "proof-of-ownership",
+    "jurisdiction": {
+      "county_code": "FULTON",
+      "county_name": "Fulton County",
+      "state": "GA",
+    },
+    "required": true,
+    "title": "Proof of ownership",
+    "type": "document",
+  },
+  {
+    "description": "Required to process disbursement of funds.",
+    "id": "w9",
+    "jurisdiction": {
+      "county_code": "FULTON",
+      "county_name": "Fulton County",
+      "state": "GA",
+    },
+    "required": true,
+    "title": "IRS W-9",
+    "type": "document",
+  },
+  {
+    "description": "Official county form for initiating a surplus claim.",
+    "id": "fulton-surplus-claim",
+    "jurisdiction": {
+      "county_code": "FULTON",
+      "county_name": "Fulton County",
+      "state": "GA",
+    },
+    "required": true,
+    "title": "Fulton County Excess Funds Claim Form",
+    "type": "form",
+  },
+  {
+    "description": "Use when claimant is an heir of the owner.",
+    "id": "affidavit-heirship",
+    "jurisdiction": {
+      "county_code": "FULTON",
+      "county_name": "Fulton County",
+      "state": "GA",
+    },
+    "required": true,
+    "title": "Affidavit of Heirship (if applicable)",
+    "type": "form",
+  },
+]
+`;

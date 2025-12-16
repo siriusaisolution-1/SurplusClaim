@@ -29,6 +29,7 @@ interface CaseSummary {
   tierSuggested: string;
   tierConfirmed?: string | null;
   assignedReviewer: { id: string; email: string } | null;
+  metadata?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,12 +57,57 @@ interface CaseDetailResponse {
     tierSuggested: string;
     tierConfirmed?: string | null;
     reviewer: { id: string; email: string } | null;
+    metadata?: Record<string, unknown> | null;
     createdAt: string;
     updatedAt: string;
   };
   timeline: CaseTimelineEvent[];
   auditTrail: AuditLogEntrySnippet[];
   allowedTransitions: CaseStatus[];
+}
+
+interface JurisdictionSummary {
+  state: string;
+  county_code: string;
+  county_name: string;
+  enabled: boolean;
+  feature_flags: { enabled: boolean; notes?: string };
+}
+
+interface JurisdictionRule extends JurisdictionSummary {
+  required_documents: {
+    id: string;
+    title: string;
+    description?: string;
+    required: boolean;
+    conditions?: string;
+  }[];
+  forms: { id: string; name: string; description?: string; url: string }[];
+  procedural: {
+    submission_channels: string[];
+    deadlines: { name: string; timeline: string; notes?: string }[];
+    addresses: {
+      name: string;
+      attention?: string;
+      line1: string;
+      line2?: string;
+      city: string;
+      state: string;
+      postal_code: string;
+    }[];
+  };
+  allowed_email_templates: { id: string; name: string; description?: string }[];
+  fee_schedule: { min_fee_cents?: number; max_fee_cents?: number };
+}
+
+interface ChecklistItem {
+  id: string;
+  title: string;
+  description?: string;
+  required: boolean;
+  conditions?: string;
+  type: 'document' | 'form';
+  jurisdiction: { state: string; county_code: string; county_name: string };
 }
 
 export default function CasesPage() {
@@ -79,12 +125,22 @@ export default function CasesPage() {
   const [error, setError] = useState<string | null>(null);
   const [transitionTarget, setTransitionTarget] = useState<CaseStatus | ''>('');
   const [transitionReason, setTransitionReason] = useState('');
+  const [jurisdictions, setJurisdictions] = useState<JurisdictionSummary[]>([]);
+  const [ruleDetails, setRuleDetails] = useState<JurisdictionRule | null>(null);
+  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
+  const [loadingRules, setLoadingRules] = useState(false);
+  const [rulesError, setRulesError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
       void router.replace('/login');
     }
   }, [loading, user, router]);
+
+  useEffect(() => {
+    if (!user || !accessToken) return;
+    void fetchJurisdictions();
+  }, [user, accessToken]);
 
   useEffect(() => {
     if (!user || !accessToken) return;
@@ -96,6 +152,33 @@ export default function CasesPage() {
       void fetchCaseDetail(caseList[0].caseRef);
     }
   }, [caseList, selectedRef]);
+
+  useEffect(() => {
+    if (!selectedCase || !accessToken) return;
+    const jurisdiction = deriveJurisdiction(selectedCase) ?? jurisdictions[0];
+    if (!jurisdiction) return;
+
+    void loadRulesForCase(jurisdiction, selectedCase.case.caseRef);
+  }, [selectedCase, jurisdictions, accessToken]);
+
+  const fetchJurisdictions = async () => {
+    if (!accessToken) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/rules/jurisdictions`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to load jurisdictions');
+      }
+
+      const payload = await response.json();
+      setJurisdictions(payload.jurisdictions ?? []);
+    } catch (err: any) {
+      console.error(err);
+      setRulesError(err.message ?? 'Unable to load jurisdictions');
+    }
+  };
 
   const fetchCases = async (targetPage: number) => {
     setLoadingList(true);
@@ -151,6 +234,63 @@ export default function CasesPage() {
       setError(err.message ?? 'Unable to load case detail');
     } finally {
       setLoadingDetail(false);
+    }
+  };
+
+  const deriveJurisdiction = (payload: CaseDetailResponse): JurisdictionSummary | null => {
+    const metadata = payload.case.metadata as any;
+    const jurisdiction = metadata?.jurisdiction as
+      | { state?: string; county_code?: string; county_name?: string }
+      | undefined;
+
+    if (jurisdiction?.state && jurisdiction?.county_code) {
+      const fallbackCountyName =
+        jurisdiction.county_name ||
+        jurisdictions.find(
+          (item) =>
+            item.state.toUpperCase() === jurisdiction.state.toUpperCase() &&
+            item.county_code.toUpperCase() === jurisdiction.county_code.toUpperCase()
+        )?.county_name;
+
+      return {
+        state: jurisdiction.state,
+        county_code: jurisdiction.county_code,
+        county_name: fallbackCountyName ?? jurisdiction.county_code,
+        enabled: true,
+        feature_flags: { enabled: true, notes: 'Derived from case metadata' }
+      };
+    }
+
+    return null;
+  };
+
+  const loadRulesForCase = async (jurisdiction: JurisdictionSummary, caseRef: string) => {
+    if (!accessToken) return;
+    setLoadingRules(true);
+    setRulesError(null);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/rules/${jurisdiction.state}/${jurisdiction.county_code}?case_ref=${caseRef}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Unable to load rules');
+      }
+
+      const payload = await response.json();
+      setRuleDetails(payload.rule ?? null);
+      setChecklistItems(payload.checklist?.items ?? []);
+    } catch (err: any) {
+      setRulesError(err.message ?? 'Unable to load jurisdiction rules');
+      setRuleDetails(null);
+      setChecklistItems([]);
+    } finally {
+      setLoadingRules(false);
     }
   };
 
@@ -376,6 +516,121 @@ export default function CasesPage() {
                         </div>
                       ))}
                     </div>
+                  </div>
+                </div>
+
+                <div
+                  style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem', marginTop: '1.25rem' }}
+                >
+                  <div>
+                    <h4>Checklist</h4>
+                    {loadingRules && <p>Loading jurisdiction rules...</p>}
+                    {rulesError && <p style={{ color: '#f87171' }}>{rulesError}</p>}
+                    {!loadingRules && !rulesError && (
+                      <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                        {checklistItems.map((item) => (
+                          <div
+                            key={item.id}
+                            style={{ borderBottom: '1px solid #1f2937', padding: '0.5rem 0' }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <div>
+                                <strong>{item.title}</strong>
+                                {item.description && (
+                                  <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>{item.description}</div>
+                                )}
+                                {item.conditions && (
+                                  <div style={{ color: '#c084fc', fontSize: '0.85rem' }}>{item.conditions}</div>
+                                )}
+                              </div>
+                              <span className="tag">{item.type === 'form' ? 'Form' : 'Document'}</span>
+                            </div>
+                          </div>
+                        ))}
+                        {checklistItems.length === 0 && <p style={{ color: '#9ca3af' }}>No checklist items</p>}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <h4>Procedural Metadata</h4>
+                    {ruleDetails ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <div>
+                          <strong>Submission channels:</strong>
+                          <div style={{ color: '#9ca3af' }}>
+                            {ruleDetails.procedural.submission_channels.join(', ')}
+                          </div>
+                        </div>
+                        {ruleDetails.procedural.deadlines.length > 0 && (
+                          <div>
+                            <strong>Deadlines</strong>
+                            <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#9ca3af' }}>
+                              {ruleDetails.procedural.deadlines.map((deadline) => (
+                                <li key={deadline.name}>
+                                  <div>
+                                    {deadline.name}: {deadline.timeline}
+                                  </div>
+                                  {deadline.notes && (
+                                    <div style={{ fontSize: '0.9rem' }}>{deadline.notes}</div>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {ruleDetails.procedural.addresses.length > 0 && (
+                          <div>
+                            <strong>Submission addresses</strong>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', color: '#9ca3af' }}>
+                              {ruleDetails.procedural.addresses.map((address) => (
+                                <div key={address.name}>
+                                  <div>{address.name}</div>
+                                  {address.attention && <div>{address.attention}</div>}
+                                  <div>{address.line1}</div>
+                                  {address.line2 && <div>{address.line2}</div>}
+                                  <div>
+                                    {address.city}, {address.state} {address.postal_code}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {ruleDetails.allowed_email_templates.length > 0 && (
+                          <div>
+                            <strong>Allowed email templates</strong>
+                            <div style={{ color: '#9ca3af' }}>
+                              {ruleDetails.allowed_email_templates.map((tpl) => tpl.name).join(', ')}
+                            </div>
+                          </div>
+                        )}
+                        <div>
+                          <strong>Fees</strong>
+                          <div style={{ color: '#9ca3af' }}>
+                            {ruleDetails.fee_schedule.min_fee_cents
+                              ? `$${(ruleDetails.fee_schedule.min_fee_cents / 100).toFixed(2)} minimum`
+                              : 'No published minimum'}
+                          </div>
+                          <div style={{ color: '#9ca3af' }}>
+                            {ruleDetails.fee_schedule.max_fee_cents
+                              ? `$${(ruleDetails.fee_schedule.max_fee_cents / 100).toFixed(2)} cap`
+                              : 'No published cap'}
+                          </div>
+                        </div>
+                        <div>
+                          <strong>Feature flag:</strong>{' '}
+                          <span className="tag" style={{ background: ruleDetails.enabled ? '#10b981' : '#f97316' }}>
+                            {ruleDetails.enabled ? 'Enabled' : 'Disabled'}
+                          </span>
+                          {ruleDetails.feature_flags.notes && (
+                            <div style={{ color: '#9ca3af' }}>{ruleDetails.feature_flags.notes}</div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <p style={{ color: '#9ca3af' }}>Select a jurisdiction with available rules.</p>
+                    )}
                   </div>
                 </div>
               </div>

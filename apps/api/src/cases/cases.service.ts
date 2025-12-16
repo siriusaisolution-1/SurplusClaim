@@ -122,7 +122,8 @@ export class CasesService {
           caseRef: input.caseRef,
           status: CaseStatus.DISCOVERED,
           tierSuggested,
-          assignedReviewerId: input.assignedReviewerId ?? null
+          assignedReviewerId: input.assignedReviewerId ?? null,
+          metadata: input.metadata ?? null
         }
       });
 

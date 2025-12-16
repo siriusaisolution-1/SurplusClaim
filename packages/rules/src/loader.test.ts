@@ -1,0 +1,46 @@
+import { describe, expect, it } from 'vitest';
+
+import { ChecklistGenerator } from './checklist';
+import { JurisdictionRuleSchema } from './schemas';
+import { RulesRegistry } from './loader';
+
+describe('RulesRegistry', () => {
+  it('loads jurisdictions from YAML configs', () => {
+    const registry = new RulesRegistry();
+    const jurisdictions = registry.listJurisdictions();
+
+    expect(jurisdictions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ state: 'GA', county_code: 'FULTON', enabled: true }),
+        expect.objectContaining({ state: 'TX', county_code: 'HARRIS', enabled: false }),
+      ])
+    );
+  });
+
+  it('validates rule shape using zod', () => {
+    expect(() =>
+      JurisdictionRuleSchema.parse({
+        state: 'GA',
+        county_code: 'FULTON',
+        county_name: 'Fulton County',
+        feature_flags: { enabled: true },
+        required_documents: [],
+        forms: [],
+        allowed_email_templates: [],
+        procedural: { submission_channels: ['mail'], deadlines: [], addresses: [] },
+        fee_schedule: {}
+      })
+    ).toThrow(/must contain at least 1 element/);
+  });
+});
+
+describe('ChecklistGenerator', () => {
+  it('produces a stable checklist for a given case context', () => {
+    const registry = new RulesRegistry();
+    const generator = new ChecklistGenerator(registry);
+
+    const checklist = generator.generate({ case_ref: 'GA-FULTON-TEST', state: 'GA', county_code: 'FULTON' });
+
+    expect(checklist).toMatchSnapshot();
+  });
+});
