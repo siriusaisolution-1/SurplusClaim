@@ -120,6 +120,32 @@ interface ChecklistItem {
   jurisdiction: { state: string; county_code: string; county_name: string };
 }
 
+interface TemplateSummary {
+  id: string;
+  version: string;
+  name: string;
+  description: string;
+  channel: string;
+  riskLevel: 'LOW' | 'HIGH';
+  variables: { name: string; required: boolean; maxLength: number | null }[];
+}
+
+interface CommunicationPreview {
+  subject: string;
+  body: string;
+}
+
+interface CommunicationRecord {
+  id: string;
+  templateId: string | null;
+  templateVersion: string | null;
+  recipient: string | null;
+  subject: string;
+  status: string;
+  sendAt: string;
+  createdAt: string;
+}
+
 const formatTierLabel = (tier?: string | null) => {
   if (!tier) return 'Unassigned';
   return TIER_LABELS[tier] ?? tier;
@@ -145,6 +171,15 @@ export default function CasesPage() {
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const [loadingRules, setLoadingRules] = useState(false);
   const [rulesError, setRulesError] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<TemplateSummary[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [templateVariables, setTemplateVariables] = useState<Record<string, string>>({});
+  const [communicationPreview, setCommunicationPreview] = useState<CommunicationPreview | null>(null);
+  const [communicationStatus, setCommunicationStatus] = useState<string | null>(null);
+  const [communicationError, setCommunicationError] = useState<string | null>(null);
+  const [sendAt, setSendAt] = useState('');
+  const [communicationHistory, setCommunicationHistory] = useState<CommunicationRecord[]>([]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -155,6 +190,11 @@ export default function CasesPage() {
   useEffect(() => {
     if (!user || !accessToken) return;
     void fetchJurisdictions();
+  }, [user, accessToken]);
+
+  useEffect(() => {
+    if (!user || !accessToken) return;
+    void fetchTemplates();
   }, [user, accessToken]);
 
   useEffect(() => {
@@ -175,6 +215,16 @@ export default function CasesPage() {
 
     void loadRulesForCase(jurisdiction, selectedCase.case.caseRef);
   }, [selectedCase, jurisdictions, accessToken]);
+
+  useEffect(() => {
+    if (!selectedRef || !accessToken) return;
+    void fetchCommunicationHistory(selectedRef);
+    setSelectedTemplateId('');
+    setTemplateVariables({});
+    setCommunicationPreview(null);
+    setCommunicationStatus(null);
+    setCommunicationError(null);
+  }, [selectedRef, accessToken]);
 
   const fetchJurisdictions = async () => {
     if (!accessToken) return;
@@ -308,6 +358,155 @@ export default function CasesPage() {
       setLoadingRules(false);
     }
   };
+
+  const fetchTemplates = async () => {
+    if (!accessToken) return;
+    setLoadingTemplates(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/communications/templates`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to load communication templates');
+      }
+
+      const payload = await response.json();
+      setTemplates(payload.templates ?? []);
+    } catch (err: any) {
+      console.error(err);
+      setCommunicationError(err.message ?? 'Unable to load templates');
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
+  const fetchCommunicationHistory = async (caseRef: string) => {
+    if (!accessToken) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/cases/${caseRef}/communications`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+
+      if (!response.ok) {
+        throw new Error('Unable to load communications');
+      }
+
+      const payload = await response.json();
+      setCommunicationHistory(payload ?? []);
+    } catch (err: any) {
+      console.error(err);
+      setCommunicationError(err.message ?? 'Unable to load communications');
+    }
+  };
+
+  const selectedTemplate = useMemo(
+    () => templates.find((tpl) => tpl.id === selectedTemplateId),
+    [templates, selectedTemplateId]
+  );
+
+  const initializeTemplateVariables = (template?: TemplateSummary) => {
+    if (!template) return {} as Record<string, string>;
+    const defaults: Record<string, string> = {};
+    template.variables.forEach((variable) => {
+      defaults[variable.name] = variable.name === 'case_ref' ? selectedCase?.case.caseRef ?? '' : '';
+    });
+    return defaults;
+  };
+
+  const handleTemplateSelection = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+    const template = templates.find((tpl) => tpl.id === templateId);
+    setTemplateVariables(initializeTemplateVariables(template));
+    setCommunicationPreview(null);
+    setCommunicationStatus(null);
+    setCommunicationError(null);
+  };
+
+  const handleVariableChange = (name: string, value: string) => {
+    setTemplateVariables((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const planCommunication = async () => {
+    if (!selectedCase || !selectedTemplateId || !accessToken) return;
+    setCommunicationError(null);
+    setCommunicationStatus('Planning preview...');
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/cases/${selectedCase.case.caseRef}/communications/plan`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({ templateId: selectedTemplateId, variables: templateVariables, sendAt: sendAt || undefined })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Unable to prepare communication');
+      }
+
+      const payload = await response.json();
+      setCommunicationPreview(payload.preview);
+      setCommunicationStatus('Preview ready');
+    } catch (err: any) {
+      console.error(err);
+      setCommunicationError(err.message ?? 'Unable to prepare communication');
+      setCommunicationStatus(null);
+    }
+  };
+
+  const sendCommunication = async (autoSend: boolean) => {
+    if (!selectedCase || !selectedTemplateId || !accessToken) return;
+    const caseTier = selectedCase.case.tierConfirmed ?? selectedCase.case.tierSuggested;
+    const isHighRiskCase = caseTier === 'HIGH' || caseTier === 'ENTERPRISE';
+    const templateRisk = selectedTemplate?.riskLevel ?? 'LOW';
+    if (isHighRiskCase && !communicationPreview) {
+      setCommunicationError('Preview is required before sending high-risk communications.');
+      return;
+    }
+
+    if (autoSend && !(caseTier === 'LOW' && templateRisk === 'LOW')) {
+      setCommunicationError('Auto-send is limited to Tier A cases with low-risk templates.');
+      return;
+    }
+
+    setCommunicationError(null);
+    setCommunicationStatus('Scheduling send...');
+    try {
+      const response = await fetch(`${API_BASE_URL}/cases/${selectedCase.case.caseRef}/communications/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          templateId: selectedTemplateId,
+          variables: templateVariables,
+          sendAt: sendAt || undefined,
+          autoSend
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Unable to queue communication');
+      }
+
+      await fetchCommunicationHistory(selectedCase.case.caseRef);
+      setCommunicationStatus('Queued for delivery');
+    } catch (err: any) {
+      console.error(err);
+      setCommunicationError(err.message ?? 'Unable to queue communication');
+      setCommunicationStatus(null);
+    }
+  };
+
+  const selectedCaseTier = selectedCase?.case.tierConfirmed ?? selectedCase?.case.tierSuggested;
+  const isHighRiskCase = selectedCaseTier === 'HIGH' || selectedCaseTier === 'ENTERPRISE';
+  const autoSendAllowed = selectedCaseTier === 'LOW' && selectedTemplate?.riskLevel === 'LOW';
+  const requiresPreview = isHighRiskCase || selectedTemplate?.riskLevel === 'HIGH';
 
   const handleTransition = async () => {
     if (!selectedCase || !transitionTarget || !accessToken) return;
@@ -646,6 +845,142 @@ export default function CasesPage() {
                     ) : (
                       <p style={{ color: '#9ca3af' }}>Select a jurisdiction with available rules.</p>
                     )}
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '1.25rem' }}>
+                  <h4>Outbound communications</h4>
+                  <p style={{ color: '#9ca3af', marginTop: '-0.25rem' }}>
+                    Subjects include the case reference automatically and a mandatory disclaimer is appended to every body.
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <label style={{ color: '#9ca3af' }}>Template</label>
+                      <select
+                        className="input"
+                        value={selectedTemplateId}
+                        onChange={(e) => handleTemplateSelection(e.target.value)}
+                      >
+                        <option value="">Select a template</option>
+                        {templates.map((tpl) => (
+                          <option key={tpl.id} value={tpl.id}>
+                            {tpl.name} (v{tpl.version})
+                          </option>
+                        ))}
+                      </select>
+                      {loadingTemplates && <span style={{ color: '#9ca3af' }}>Loading templates…</span>}
+                      {selectedTemplate && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <div style={{ color: '#9ca3af', fontSize: '0.95rem' }}>
+                            {selectedTemplate.description} · Channel: {selectedTemplate.channel} · Risk:{' '}
+                            <span className="tag" style={{ background: selectedTemplate.riskLevel === 'HIGH' ? '#f97316' : '#10b981' }}>
+                              {selectedTemplate.riskLevel}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                              gap: '0.5rem'
+                            }}
+                          >
+                            {selectedTemplate.variables.map((variable) => (
+                              <div key={variable.name} style={{ display: 'flex', flexDirection: 'column' }}>
+                                <label style={{ color: '#9ca3af' }}>
+                                  {variable.name} {variable.required ? '*' : ''}
+                                </label>
+                                <input
+                                  className="input"
+                                  value={templateVariables[variable.name] ?? ''}
+                                  onChange={(e) => handleVariableChange(variable.name, e.target.value)}
+                                  placeholder={variable.name === 'case_ref' ? selectedCase.case.caseRef : 'Enter value'}
+                                  disabled={variable.name === 'case_ref'}
+                                  maxLength={variable.maxLength ?? undefined}
+                                />
+                              </div>
+                            ))}
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <label style={{ color: '#9ca3af' }}>Send at (optional)</label>
+                              <input
+                                className="input"
+                                type="datetime-local"
+                                value={sendAt}
+                                onChange={(e) => setSendAt(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <button className="button" onClick={planCommunication} disabled={!selectedTemplateId}>
+                              Preview
+                            </button>
+                            <button
+                              className="button"
+                              onClick={() => sendCommunication(false)}
+                              disabled={!selectedTemplateId || (requiresPreview && !communicationPreview)}
+                            >
+                              Queue send
+                            </button>
+                            <button
+                              className="button"
+                              onClick={() => sendCommunication(true)}
+                              disabled={!selectedTemplateId || !autoSendAllowed}
+                            >
+                              Auto-send (Tier A + low risk)
+                            </button>
+                          </div>
+                          <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>
+                            {requiresPreview
+                              ? 'Preview required for high-risk cases or templates before sending.'
+                              : 'Auto-send is only enabled for Tier A cases with low-risk templates.'}
+                          </div>
+                          {communicationStatus && <div style={{ color: '#10b981' }}>{communicationStatus}</div>}
+                          {communicationError && <div style={{ color: '#f87171' }}>{communicationError}</div>}
+                          {communicationPreview && (
+                            <div style={{ marginTop: '0.5rem' }}>
+                              <h5>Preview</h5>
+                              <div style={{ color: '#9ca3af' }}>Subject: {communicationPreview.subject}</div>
+                              <pre
+                                style={{
+                                  background: '#0b1320',
+                                  padding: '0.75rem',
+                                  borderRadius: '8px',
+                                  whiteSpace: 'pre-wrap',
+                                  wordBreak: 'break-word'
+                                }}
+                              >
+                                {communicationPreview.body}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <h5>Recent communications</h5>
+                      <div style={{ maxHeight: '360px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {communicationHistory.map((item) => (
+                          <div key={item.id} style={{ border: '1px solid #1f2937', borderRadius: '8px', padding: '0.75rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <strong>{item.subject}</strong>
+                              <span className="tag">{item.status}</span>
+                            </div>
+                            <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>
+                              Template: {item.templateId ?? 'n/a'} v{item.templateVersion ?? 'n/a'}
+                            </div>
+                            <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>
+                              Send at: {new Date(item.sendAt).toLocaleString()}
+                            </div>
+                            <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>
+                              Recipient: {item.recipient ?? 'unspecified'}
+                            </div>
+                          </div>
+                        ))}
+                        {communicationHistory.length === 0 && (
+                          <div style={{ color: '#9ca3af' }}>No communications planned for this case yet.</div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
