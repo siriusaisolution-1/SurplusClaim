@@ -1,0 +1,246 @@
+// Prisma schema defining multitenant data model for Surplus Claim
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  TENANT_ADMIN
+  REVIEWER
+  OPS
+  B2B_CLIENT
+  READ_ONLY
+}
+
+enum CaseStatus {
+  NEW
+  IN_REVIEW
+  NEEDS_INFO
+  APPROVED
+  REJECTED
+  PAID_OUT
+}
+
+enum TierLevel {
+  LOW
+  MEDIUM
+  HIGH
+  ENTERPRISE
+}
+
+enum CommunicationDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum CommunicationChannel {
+  EMAIL
+  SMS
+}
+
+model Tenant {
+  id          String   @id @default(uuid())
+  name        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users           User[]
+  cases           Case[]
+  feeAgreements   FeeAgreement[]
+  auditLogEntries AuditLog[]
+
+  @@unique([name])
+}
+
+model User {
+  id        String   @id @default(uuid())
+  tenantId  String
+  email     String
+  fullName  String
+  role      UserRole
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  casesAssigned Case[] @relation("CaseReviewer")
+  auditEntries  AuditLog[] @relation("AuditActor")
+
+  @@unique([tenantId, email])
+  @@index([tenantId, role])
+}
+
+model Case {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  caseRef            String
+  status             CaseStatus
+  tierSuggested      TierLevel
+  tierConfirmed      TierLevel?
+  assignedReviewerId String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  tenant           Tenant @relation(fields: [tenantId], references: [id])
+  assignedReviewer User?  @relation("CaseReviewer", fields: [assignedReviewerId], references: [id])
+  events           CaseEvent[]
+  artifacts        Artifact[]
+  documents        Document[]
+  consents         Consent[]
+  communications   Communication[]
+  payouts          Payout[]
+  auditTrail       AuditLog[]
+
+  @@unique([tenantId, caseRef])
+  @@index([tenantId, status])
+  @@index([tenantId, caseRef])
+}
+
+model CaseEvent {
+  id        String   @id @default(uuid())
+  tenantId  String
+  caseId    String
+  caseRef   String
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+  processedAt DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  case   Case   @relation(fields: [caseId], references: [id])
+
+  @@index([tenantId, caseRef])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String
+  caseId    String?
+  caseRef   String
+  actorId   String?
+  action    String
+  metadata  Json?
+  hash      String
+  prevHash  String?
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  case   Case?  @relation(fields: [caseId], references: [id])
+  actor  User?  @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@unique([tenantId, hash])
+  @@index([tenantId, caseRef])
+}
+
+model Artifact {
+  id         String   @id @default(uuid())
+  tenantId   String
+  caseId     String
+  caseRef    String
+  objectKey  String
+  sha256     String
+  source     String?
+  createdAt  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  case   Case   @relation(fields: [caseId], references: [id])
+  consent Consent?
+
+  @@index([tenantId, caseRef])
+  @@unique([tenantId, objectKey])
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  tenantId  String
+  caseId    String
+  caseRef   String
+  objectKey String
+  sha256    String
+  docType   String?
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  case   Case   @relation(fields: [caseId], references: [id])
+
+  @@index([tenantId, caseRef])
+  @@unique([tenantId, objectKey])
+}
+
+model Consent {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  caseId             String
+  caseRef            String
+  consentVersion     String
+  consentArtifactId  String?
+  signedAt           DateTime
+  revokedAt          DateTime?
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  case     Case     @relation(fields: [caseId], references: [id])
+  artifact Artifact @relation(fields: [consentArtifactId], references: [id])
+
+  @@index([tenantId, caseRef])
+}
+
+model Communication {
+  id          String                  @id @default(uuid())
+  tenantId    String
+  caseId      String
+  caseRef     String
+  subject     String
+  body        String
+  direction   CommunicationDirection
+  channel     CommunicationChannel
+  status      String
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  case   Case   @relation(fields: [caseId], references: [id])
+
+  @@index([tenantId, caseRef])
+  @@index([tenantId, status])
+}
+
+model Payout {
+  id             String   @id @default(uuid())
+  tenantId       String
+  caseId         String
+  caseRef        String
+  amountCents    Int
+  currency       String   @default("USD")
+  status         String
+  reference      String?
+  processedAt    DateTime?
+  createdAt      DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  case   Case   @relation(fields: [caseId], references: [id])
+
+  @@index([tenantId, caseRef])
+  @@index([tenantId, status])
+}
+
+model FeeAgreement {
+  id             String   @id @default(uuid())
+  tenantId       String
+  tierMin        TierLevel
+  tierMax        TierLevel
+  capAmountCents Int?
+  minFeeCents    Int?
+  b2bOverride    Int?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, tierMin, tierMax])
+}
