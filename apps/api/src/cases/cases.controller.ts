@@ -39,6 +39,7 @@ export class CasesController {
         assignedReviewer: item.assignedReviewer
           ? { id: item.assignedReviewer.id, email: item.assignedReviewer.email }
           : null,
+        metadata: item.metadata,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt
       }))
@@ -92,6 +93,7 @@ export class CasesController {
         reviewer: details.caseRecord.assignedReviewer
           ? { id: details.caseRecord.assignedReviewer.id, email: details.caseRecord.assignedReviewer.email }
           : null,
+        metadata: details.caseRecord.metadata,
         createdAt: details.caseRecord.createdAt,
         updatedAt: details.caseRecord.updatedAt
       },

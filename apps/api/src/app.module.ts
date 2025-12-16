@@ -10,15 +10,18 @@ import { CasesController } from './cases/cases.controller';
 import { CasesService } from './cases/cases.service';
 import { HealthController } from './health.controller';
 import { MeController } from './me.controller';
+import { RulesController } from './rules/rules.controller';
+import { RulesService } from './rules/rules.service';
 import { UsersService } from './users/users.service';
 
 @Module({
-  controllers: [HealthController, AuthController, MeController, CasesController, AuditController],
+  controllers: [HealthController, AuthController, MeController, CasesController, AuditController, RulesController],
   providers: [
     AuditService,
     AuthService,
     UsersService,
     CasesService,
+    RulesService,
     {
       provide: APP_GUARD,
       useClass: AuthGuard

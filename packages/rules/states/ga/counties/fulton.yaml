@@ -1,0 +1,54 @@
+state: GA
+county_code: FULTON
+county_name: Fulton County
+feature_flags:
+  enabled: true
+  notes: "County verified for checklist generation"
+required_documents:
+  - id: claimant-id
+    title: Government-issued photo ID
+    description: Identification for the claimant or authorized representative.
+    required: true
+  - id: proof-of-ownership
+    title: Proof of ownership
+    description: Deed, tax bill, or other evidence that ties the claimant to the property.
+    required: true
+  - id: w9
+    title: IRS W-9
+    description: Required to process disbursement of funds.
+    required: true
+forms:
+  - id: fulton-surplus-claim
+    name: Fulton County Excess Funds Claim Form
+    url: https://example.org/forms/fulton-surplus-claim.pdf
+    description: Official county form for initiating a surplus claim.
+  - id: affidavit-heirship
+    name: Affidavit of Heirship (if applicable)
+    url: https://example.org/forms/fulton-affidavit-heirship.pdf
+    description: Use when claimant is an heir of the owner.
+procedural:
+  submission_channels:
+    - mail
+    - in_person
+  deadlines:
+    - name: filing-window
+      timeline: Submit within 60 days of sale confirmation date.
+      notes: Based on public-facing county guidance.
+  addresses:
+    - name: Clerk of Superior Court
+      attention: Records Division
+      line1: 136 Pryor Street SW
+      line2: Suite C-155
+      city: Atlanta
+      state: GA
+      postal_code: "30303"
+allowed_email_templates:
+  - id: claimant-intake
+    name: Initial claimant outreach
+    description: Neutral request for documents and authorization.
+  - id: deficiency-followup
+    name: Deficiency follow-up
+    description: Reminder for missing paperwork.
+fee_schedule:
+  min_fee_cents: 7500
+  max_fee_cents: 150000

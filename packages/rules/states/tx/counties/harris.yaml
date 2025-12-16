@@ -1,0 +1,41 @@
+state: TX
+county_code: HARRIS
+county_name: Harris County
+feature_flags:
+  enabled: false
+  notes: "Do not enable in production until addresses are confirmed"
+required_documents:
+  - id: claimant-id
+    title: Photo ID
+    description: Identification for claimant.
+    required: true
+  - id: claim-packet
+    title: County claim packet
+    description: Completed Harris County claim packet.
+    required: true
+forms:
+  - id: harris-surplus-claim
+    name: Harris County Application for Surplus Proceeds
+    url: https://example.org/forms/harris-surplus-claim.pdf
+    description: Reference copy of the official form.
+procedural:
+  submission_channels:
+    - mail
+  deadlines:
+    - name: appeal-period
+      timeline: Submit prior to expiration of redemption period.
+      notes: Derived from published timelines; confirm before filing.
+  addresses:
+    - name: Harris County Clerk
+      attention: Civil Courthouse
+      line1: 201 Caroline St
+      city: Houston
+      state: TX
+      postal_code: "77002"
+allowed_email_templates:
+  - id: claimant-intake
+    name: Intake outreach
+    description: Initial neutral outreach to claimant.
+fee_schedule:
+  min_fee_cents: 5000
+  max_fee_cents: 100000

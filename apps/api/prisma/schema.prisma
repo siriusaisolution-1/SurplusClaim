@@ -91,6 +91,7 @@ model Case {
   tierSuggested      TierLevel
   tierConfirmed      TierLevel?
   assignedReviewerId String?
+  metadata           Json?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
