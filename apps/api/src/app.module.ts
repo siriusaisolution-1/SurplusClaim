@@ -16,6 +16,8 @@ import { UsersService } from './users/users.service';
 import { ConnectorsModule } from './connectors/connectors.module';
 import { CommunicationsService } from './communications/communications.service';
 import { CommunicationsController } from './communications/communications.controller';
+import { ConsentController } from './consent/consent.controller';
+import { ConsentService } from './consent/consent.service';
 
 @Module({
   imports: [ConnectorsModule],
@@ -26,7 +28,8 @@ import { CommunicationsController } from './communications/communications.contro
     CasesController,
     AuditController,
     RulesController,
-    CommunicationsController
+    CommunicationsController,
+    ConsentController
   ],
   providers: [
     AuditService,
@@ -35,6 +38,7 @@ import { CommunicationsController } from './communications/communications.contro
     CasesService,
     RulesService,
     CommunicationsService,
+    ConsentService,
     {
       provide: APP_GUARD,
       useClass: AuthGuard

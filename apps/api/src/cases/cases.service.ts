@@ -482,6 +482,15 @@ export class CasesService {
       );
     }
 
+    if (
+      [CaseStatus.DOCUMENT_COLLECTION, CaseStatus.PACKAGE_READY].includes(input.toState) &&
+      !(await prisma.consent.findFirst({
+        where: { tenantId, caseRef, revokedAt: null }
+      }))
+    ) {
+      throw new BadRequestException('Cannot proceed without a signed consent on file');
+    }
+
     const updatedCase = await prisma.$transaction(async (tx) => {
       const record = await tx.case.update({
         where: { id: caseRecord.id },

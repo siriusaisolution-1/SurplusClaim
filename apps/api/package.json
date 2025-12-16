@@ -23,6 +23,7 @@
     "@surplus/connectors": "workspace:*",
     "@surplus/rules": "workspace:*",
     "jsonwebtoken": "9.0.2",
+    "pdfkit": "0.15.0",
     "reflect-metadata": "0.1.13",
     "rxjs": "7.8.1"
   },
