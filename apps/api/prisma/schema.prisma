@@ -203,11 +203,17 @@ model Communication {
   tenantId    String
   caseId      String
   caseRef     String
+  templateId  String?
+  templateVersion String?
+  recipient   String?
+  variables   Json?
   subject     String
   body        String
   direction   CommunicationDirection
   channel     CommunicationChannel
   status      String
+  sendAt      DateTime                @default(now())
+  providerMessageId String?
   createdAt   DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id])

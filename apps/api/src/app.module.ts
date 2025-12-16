@@ -14,16 +14,27 @@ import { RulesController } from './rules/rules.controller';
 import { RulesService } from './rules/rules.service';
 import { UsersService } from './users/users.service';
 import { ConnectorsModule } from './connectors/connectors.module';
+import { CommunicationsService } from './communications/communications.service';
+import { CommunicationsController } from './communications/communications.controller';
 
 @Module({
   imports: [ConnectorsModule],
-  controllers: [HealthController, AuthController, MeController, CasesController, AuditController, RulesController],
+  controllers: [
+    HealthController,
+    AuthController,
+    MeController,
+    CasesController,
+    AuditController,
+    RulesController,
+    CommunicationsController
+  ],
   providers: [
     AuditService,
     AuthService,
     UsersService,
     CasesService,
     RulesService,
+    CommunicationsService,
     {
       provide: APP_GUARD,
       useClass: AuthGuard
