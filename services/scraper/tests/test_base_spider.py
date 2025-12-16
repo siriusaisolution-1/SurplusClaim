@@ -90,5 +90,5 @@ def test_result_includes_sha(tmp_path, monkeypatch):
     result = list(spider.parse_watch(response, Cursor()))[0]
     validated = NormalizedCaseResult.model_validate(result)
 
-    assert validated.source.raw_sha256
-    assert validated.source.url == url
+    assert validated.source["raw_sha256"]
+    assert validated.source["url"] == url

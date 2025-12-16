@@ -143,7 +143,7 @@ class BaseSpider(scrapy.Spider):
 
     def wrap_normalized_case(self, normalized_case: dict, response: Response, artifact_key: str | None = None) -> NormalizedCaseResult:
         source = self.build_source_metadata(response, artifact_key)
-        return NormalizedCaseResult(normalized_case=normalized_case, source=source)
+        return NormalizedCaseResult.model_validate({"normalized_case": normalized_case, "source": source})
 
     def sleep_between_requests(self, seconds: float) -> None:
         time.sleep(seconds)

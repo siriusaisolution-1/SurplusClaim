@@ -25,6 +25,27 @@ const DEFAULT_CONNECTORS: ConnectorConfig[] = [
     watchUrls: ['https://www.maricopa.gov'],
     scheduleInterval: 60 * 60,
     parsingMode: 'raw' satisfies ParsingMode
+  },
+  {
+    key: { state: 'TX', county_code: 'TRAVIS' },
+    spiderName: 'html_table_overages',
+    watchUrls: ['https://data.example.gov/overages/html-table'],
+    scheduleInterval: 60 * 30,
+    parsingMode: 'normalized' satisfies ParsingMode
+  },
+  {
+    key: { state: 'FL', county_code: 'ORANGE' },
+    spiderName: 'pdf_list_overages',
+    watchUrls: ['https://data.example.gov/overages/pdf-list'],
+    scheduleInterval: 60 * 45,
+    parsingMode: 'normalized' satisfies ParsingMode
+  },
+  {
+    key: { state: 'WA', county_code: 'KING' },
+    spiderName: 'csv_feed_overages',
+    watchUrls: ['https://data.example.gov/overages/csv-feed'],
+    scheduleInterval: 60 * 20,
+    parsingMode: 'normalized' satisfies ParsingMode
   }
 ];
 

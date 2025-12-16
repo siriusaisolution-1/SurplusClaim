@@ -1,0 +1,3 @@
+property_id,owner,address,amount,sale_date,status
+C9001,Amanda West,"101 Oak St, Seattle, WA 98101",2200.00,2024-02-10,open
+C9002,Michael Green,"55 Lake View Dr, Seattle, WA 98102",1575.25,2024-02-18,closed
