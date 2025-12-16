@@ -1,0 +1,5 @@
+# Compiled with pip-tools
+Scrapy==2.11.1
+scrapy-playwright==0.0.36
+scrapyd==1.4.3
+pytest==8.1.1

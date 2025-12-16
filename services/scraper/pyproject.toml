@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=67"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "surplus-scraper"
+version = "0.1.0"
+description = "Scrapy project for surplus claims"
+authors = [{name = "Surplus Team"}]
+requires-python = ">=3.11"
+readme = "README.md"
+
+[tool.setuptools.packages.find]
+where = ["."]
