@@ -13,8 +13,10 @@ import { MeController } from './me.controller';
 import { RulesController } from './rules/rules.controller';
 import { RulesService } from './rules/rules.service';
 import { UsersService } from './users/users.service';
+import { ConnectorsModule } from './connectors/connectors.module';
 
 @Module({
+  imports: [ConnectorsModule],
   controllers: [HealthController, AuthController, MeController, CasesController, AuditController, RulesController],
   providers: [
     AuditService,
