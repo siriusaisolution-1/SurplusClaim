@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 
+import { AuditController } from './audit/audit.controller';
 import { AuditService } from './audit/audit.service';
 import { AuthController } from './auth/auth.controller';
 import { AuthGuard } from './auth/auth.guard';
@@ -12,7 +13,7 @@ import { MeController } from './me.controller';
 import { UsersService } from './users/users.service';
 
 @Module({
-  controllers: [HealthController, AuthController, MeController, CasesController],
+  controllers: [HealthController, AuthController, MeController, CasesController, AuditController],
   providers: [
     AuditService,
     AuthService,
