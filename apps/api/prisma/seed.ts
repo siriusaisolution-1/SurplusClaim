@@ -1,4 +1,5 @@
 import { prisma } from '../src/prisma/prisma.client';
+import { hashPasswordForStorage } from '../src/auth/password.util';
 
 async function main() {
   const tenant = await prisma.tenant.upsert({
@@ -17,13 +18,15 @@ async function main() {
       }
     },
     update: {
-      fullName: 'Demo Admin'
+      fullName: 'Demo Admin',
+      passwordHash: hashPasswordForStorage('ChangeMe123!')
     },
     create: {
       tenantId: tenant.id,
       email: 'admin@demo.local',
       fullName: 'Demo Admin',
-      role: 'TENANT_ADMIN'
+      role: 'TENANT_ADMIN',
+      passwordHash: hashPasswordForStorage('ChangeMe123!')
     }
   });
 }

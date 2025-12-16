@@ -64,6 +64,7 @@ model User {
   tenantId  String
   email     String
   fullName  String
+  passwordHash String
   role      UserRole
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -71,6 +72,7 @@ model User {
   tenant Tenant @relation(fields: [tenantId], references: [id])
   casesAssigned Case[] @relation("CaseReviewer")
   auditEntries  AuditLog[] @relation("AuditActor")
+  sessions Session[]
 
   @@unique([tenantId, email])
   @@index([tenantId, role])
@@ -243,4 +245,20 @@ model FeeAgreement {
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId, tierMin, tierMax])
+}
+
+model Session {
+  id               String   @id @default(uuid())
+  tenantId         String
+  userId           String
+  refreshTokenHash String
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+  revokedAt        DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, userId])
+  @@unique([refreshTokenHash])
 }
