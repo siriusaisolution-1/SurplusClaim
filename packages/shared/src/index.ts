@@ -1,1 +1,2 @@
-export const serviceName = 'surplus-claim-shared';
+export * from './caseRef';
+export * from './schemas';
