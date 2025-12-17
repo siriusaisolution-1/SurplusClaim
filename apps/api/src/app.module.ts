@@ -9,6 +9,8 @@ import { AuthService } from './auth/auth.service';
 import { CasesController } from './cases/cases.controller';
 import { CasePackageController } from './cases/case-package.controller';
 import { CasesService } from './cases/cases.service';
+import { CaseSubmissionController } from './cases/case-submission.controller';
+import { CaseSubmissionService } from './cases/case-submission.service';
 import { HealthController } from './health.controller';
 import { MeController } from './me.controller';
 import { RulesController } from './rules/rules.controller';
@@ -31,6 +33,7 @@ import { CasePackageService } from './cases/case-package.service';
     MeController,
     CasesController,
     CasePackageController,
+    CaseSubmissionController,
     AuditController,
     RulesController,
     CommunicationsController,
@@ -44,6 +47,7 @@ import { CasePackageService } from './cases/case-package.service';
     CasesService,
     CasePackageService,
     RulesService,
+    CaseSubmissionService,
     CommunicationsService,
     ConsentService,
     DocumentsService,

@@ -248,6 +248,28 @@ export const templateRegistry = new TemplateRegistry([
       status_note: { maxLength: 400, required: true },
       case_ref: { pattern: CASE_REF_PATTERN, required: true }
     }
+  },
+  {
+    id: 'deadline_reminder',
+    version: 'v1',
+    name: 'Procedural deadline reminder',
+    description: 'Notify internal owners about an upcoming procedural deadline.',
+    channel: 'EMAIL',
+    riskLevel: 'LOW',
+    subject: '[{{case_ref}}] Deadline approaching: {{deadline_name}}',
+    body: [
+      'Hello {{recipient_name}},',
+      'This is a reminder that the procedural item {{deadline_name}} is due by {{due_date}} for case {{case_ref}}.',
+      'If this has already been handled, no further action is needed. For questions, reply to {{reply_to}}.'
+    ].join(' '),
+    variables: {
+      recipient_name: { pattern: /^[A-Za-z .'-]{2,80}$/, required: true },
+      recipient_email: { pattern: EMAIL_PATTERN, required: true },
+      reply_to: { pattern: EMAIL_PATTERN, required: true },
+      deadline_name: { maxLength: 120, required: true },
+      due_date: { maxLength: 120, required: true },
+      case_ref: { pattern: CASE_REF_PATTERN, required: true }
+    }
   }
 ]);
 

@@ -107,7 +107,9 @@ export class CasesController {
       },
       timeline: details.events,
       auditTrail: details.auditTrail,
-      allowedTransitions: details.allowedTransitions
+      allowedTransitions: details.allowedTransitions,
+      reminderHistory: details.reminderHistory,
+      nextDeadline: details.nextDeadline
     };
   }
 
