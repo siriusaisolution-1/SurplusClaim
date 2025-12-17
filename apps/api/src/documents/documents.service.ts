@@ -249,6 +249,11 @@ export class DocumentsService {
     return { document: updated, checklist };
   }
 
+  async getChecklistProgress(tenantId: string, caseRef: string) {
+    const caseRecord = await this.findCaseOrThrow(tenantId, caseRef);
+    return this.buildChecklistProgress(caseRecord);
+  }
+
   async mergeChecklistWithDocuments(tenantId: string, caseRef: string, items: any[]) {
     const caseRecord = await this.findCaseOrThrow(tenantId, caseRef);
     const documents = await prisma.document.findMany({ where: { tenantId, caseId: caseRecord.id } });

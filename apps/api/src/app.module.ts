@@ -7,6 +7,7 @@ import { AuthController } from './auth/auth.controller';
 import { AuthGuard } from './auth/auth.guard';
 import { AuthService } from './auth/auth.service';
 import { CasesController } from './cases/cases.controller';
+import { CasePackageController } from './cases/case-package.controller';
 import { CasesService } from './cases/cases.service';
 import { HealthController } from './health.controller';
 import { MeController } from './me.controller';
@@ -20,6 +21,7 @@ import { ConsentController } from './consent/consent.controller';
 import { ConsentService } from './consent/consent.service';
 import { DocumentsController } from './documents/documents.controller';
 import { DocumentsService } from './documents/documents.service';
+import { CasePackageService } from './cases/case-package.service';
 
 @Module({
   imports: [ConnectorsModule],
@@ -28,6 +30,7 @@ import { DocumentsService } from './documents/documents.service';
     AuthController,
     MeController,
     CasesController,
+    CasePackageController,
     AuditController,
     RulesController,
     CommunicationsController,
@@ -39,6 +42,7 @@ import { DocumentsService } from './documents/documents.service';
     AuthService,
     UsersService,
     CasesService,
+    CasePackageService,
     RulesService,
     CommunicationsService,
     ConsentService,
