@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { NavBar } from '../components/NavBar';
 import { useAuth } from '../lib/auth-context';
 import { API_BASE_URL } from '../lib/api';
+import { formatSafeLabel, sanitizeDocType } from '../lib/safety';
 
 const CASE_STATUSES = [
   'DISCOVERED',
@@ -1154,14 +1155,19 @@ export default function CasesPage() {
                             SHA256: {doc.sha256}
                           </div>
                           <div style={{ display: 'flex', gap: '0.5rem', color: '#e5e7eb', marginTop: '0.35rem' }}>
-                            <span>Doc type: {doc.docType ?? doc.aiDocType ?? 'Unlabeled'}</span>
+                            <span>Doc type: {formatSafeLabel(doc.docType ?? doc.aiDocType)}</span>
                             {doc.aiConfidence && <span>AI confidence: {(doc.aiConfidence * 100).toFixed(1)}%</span>}
                           </div>
                           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
                             <button
                               className="button"
                               onClick={() =>
-                                handleReview(doc.id, 'APPROVED', undefined, doc.docType ?? doc.aiDocType ?? undefined)
+                                handleReview(
+                                  doc.id,
+                                  'APPROVED',
+                                  undefined,
+                                  sanitizeDocType(doc.docType ?? doc.aiDocType)
+                                )
                               }
                             >
                               Approve
@@ -1175,7 +1181,7 @@ export default function CasesPage() {
                                   doc.id,
                                   'REJECTED',
                                   note ?? undefined,
-                                  doc.docType ?? doc.aiDocType ?? undefined
+                                  sanitizeDocType(doc.docType ?? doc.aiDocType)
                                 );
                               }}
                             >

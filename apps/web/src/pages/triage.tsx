@@ -4,6 +4,7 @@ import Head from 'next/head';
 import { NavBar } from '../components/NavBar';
 import { API_BASE_URL } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
+import { guardSuggestionResponse } from '../lib/safety';
 
 export type TierChoice = 'TIER_A' | 'TIER_B' | 'TIER_C';
 
@@ -53,6 +54,7 @@ interface TriageSuggestionResponse {
   rationale: string[];
   confidence: number;
   escalates: boolean;
+  disclaimer: string;
 }
 
 export default function TriagePage() {
@@ -134,7 +136,11 @@ export default function TriagePage() {
       }
 
       const payload: TriageSuggestionResponse = await response.json();
-      setSuggestion(payload);
+      const guarded = guardSuggestionResponse(payload);
+      if (!guarded) {
+        throw new Error('AI output blocked because it did not pass compliance validation');
+      }
+      setSuggestion(guarded);
     } catch (err: any) {
       setError(err.message ?? 'Unable to suggest tier');
     } finally {
@@ -344,6 +350,7 @@ export default function TriagePage() {
                         ))}
                       </ul>
                       <div>Escalates: {suggestion.escalates ? 'Yes (Tier C -> Escalated)' : 'No'}</div>
+                      <p style={{ marginTop: '0.5rem', color: '#fbbf24' }}>{suggestion.disclaimer}</p>
                     </div>
                   </div>
                 )}

@@ -1,4 +1,5 @@
 import { CASE_REF_PATTERN } from '../caseRef';
+import { UPL_DISCLAIMER } from '../upl';
 
 type RiskLevel = 'LOW' | 'HIGH';
 
@@ -37,11 +38,6 @@ export type RenderedCommunication = {
   templateVersion: string;
   disclaimer: string;
 };
-
-const DISCLAIMER = [
-  'This communication is provided for informational purposes only and does not constitute legal advice.',
-  'If you are not the intended recipient, please disregard and notify the sender. Service levels may vary by jurisdiction.'
-].join(' ');
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -116,14 +112,14 @@ export class TemplateRegistry {
       throw new Error('Subject must include case reference token');
     }
 
-    const body = `${this.interpolate(template.body, validated)}\n\n---\n${DISCLAIMER}`;
+    const body = `${this.interpolate(template.body, validated)}\n\n---\n${UPL_DISCLAIMER}`;
 
     return {
       subject,
       body,
       templateId: template.id,
       templateVersion: template.version,
-      disclaimer: DISCLAIMER
+      disclaimer: UPL_DISCLAIMER
     };
   }
 

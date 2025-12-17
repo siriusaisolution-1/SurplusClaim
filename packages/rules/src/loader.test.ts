@@ -17,6 +17,15 @@ describe('RulesRegistry', () => {
     );
   });
 
+  it('respects kill-switch feature flags from environment overrides', () => {
+    const registry = new RulesRegistry({ disabledJurisdictions: ['GA-FULTON'] });
+
+    expect(registry.getRule('GA', 'FULTON')).toBeUndefined();
+    const jurisdictions = registry.listJurisdictions();
+    const fulton = jurisdictions.find((item) => item.state === 'GA' && item.county_code === 'FULTON');
+    expect(fulton?.enabled).toBe(false);
+  });
+
   it('validates rule shape using zod', () => {
     expect(() =>
       JurisdictionRuleSchema.parse({

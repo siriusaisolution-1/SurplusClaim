@@ -27,6 +27,7 @@ import { CasePackageService } from './cases/case-package.service';
 import { PayoutsController } from './payouts/payouts.controller';
 import { PayoutsService } from './payouts/payouts.service';
 import { FeeCalculatorService } from './payouts/fee-calculator.service';
+import { LegalSafetyService } from './safety/legal-safety.service';
 
 @Module({
   imports: [ConnectorsModule],
@@ -57,6 +58,7 @@ import { FeeCalculatorService } from './payouts/fee-calculator.service';
     DocumentsService,
     PayoutsService,
     FeeCalculatorService,
+    LegalSafetyService,
     {
       provide: APP_GUARD,
       useClass: AuthGuard

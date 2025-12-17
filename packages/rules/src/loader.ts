@@ -4,6 +4,21 @@ import yaml from 'js-yaml';
 
 import { ChecklistItem, JurisdictionRule, JurisdictionRuleSchema, getDefaultRulesDirectory } from './schemas';
 
+type RulesRegistryOptions = {
+  basePath?: string;
+  disabledJurisdictions?: string[];
+};
+
+function parseDisabledJurisdictions(value?: string) {
+  if (!value) return new Set<string>();
+  return new Set(
+    value
+      .split(',')
+      .map((item) => item.trim().toUpperCase())
+      .filter(Boolean)
+  );
+}
+
 function buildKey(state: string, countyCode: string) {
   return `${state.toUpperCase()}-${countyCode.toUpperCase()}`;
 }
@@ -12,8 +27,14 @@ export class RulesRegistry {
   private rules = new Map<string, JurisdictionRule>();
   private basePath: string;
 
-  constructor(basePath?: string) {
-    this.basePath = basePath ?? getDefaultRulesDirectory(__dirname);
+  private readonly disabledJurisdictions: Set<string>;
+
+  constructor(options?: RulesRegistryOptions) {
+    this.basePath = options?.basePath ?? getDefaultRulesDirectory(__dirname);
+    this.disabledJurisdictions =
+      options?.disabledJurisdictions?.length
+        ? new Set(options.disabledJurisdictions.map((item) => item.toUpperCase()))
+        : parseDisabledJurisdictions(process.env.DISABLED_JURISDICTIONS);
     this.loadRules();
   }
 
@@ -42,18 +63,26 @@ export class RulesRegistry {
     });
   }
 
+  private isEnabled(rule: JurisdictionRule) {
+    const key = buildKey(rule.state, rule.county_code);
+    return rule.feature_flags.enabled && !this.disabledJurisdictions.has(key);
+  }
+
   listJurisdictions() {
     return Array.from(this.rules.values()).map((rule) => ({
       state: rule.state,
       county_code: rule.county_code,
       county_name: rule.county_name,
-      enabled: rule.feature_flags.enabled,
+      enabled: this.isEnabled(rule),
       feature_flags: rule.feature_flags,
     }));
   }
 
   getRule(state: string, countyCode: string): JurisdictionRule | undefined {
-    return this.rules.get(buildKey(state, countyCode));
+    const rule = this.rules.get(buildKey(state, countyCode));
+    if (!rule) return undefined;
+    if (!this.isEnabled(rule)) return undefined;
+    return rule;
   }
 
   getChecklistItems(state: string, countyCode: string): ChecklistItem[] {

@@ -4,6 +4,7 @@ import { CommunicationChannel as PrismaChannel, CommunicationDirection, TierLeve
 
 import { AuditService } from '../audit/audit.service';
 import { prisma } from '../prisma/prisma.client';
+import { LegalSafetyService } from '../safety/legal-safety.service';
 
 type PlanInput = {
   templateId: string;
@@ -17,7 +18,7 @@ type SendInput = PlanInput & {
 
 @Injectable()
 export class CommunicationsService {
-  constructor(private auditService: AuditService) {}
+  constructor(private auditService: AuditService, private legalSafety: LegalSafetyService) {}
 
   listTemplates() {
     return templateRegistry.list().map((tpl) => ({
@@ -45,7 +46,8 @@ export class CommunicationsService {
       plan,
       preview,
       riskLevel: template.riskLevel,
-      tier: context.tier
+      tier: context.tier,
+      disclaimer: this.legalSafety.disclaimer
     };
   }
 
@@ -93,7 +95,7 @@ export class CommunicationsService {
       }
     });
 
-    return { record, preview, autoSendAllowed };
+    return { record, preview, autoSendAllowed, disclaimer: this.legalSafety.disclaimer };
   }
 
   async listCaseCommunications(tenantId: string, caseRef: string) {
