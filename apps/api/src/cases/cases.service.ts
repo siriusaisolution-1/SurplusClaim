@@ -8,6 +8,7 @@ import { CaseStatus, TierLevel } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { prisma } from '../prisma/prisma.client';
+import { LegalSafetyService } from '../safety/legal-safety.service';
 
 export type CreateCaseInput = {
   caseRef: string;
@@ -106,7 +107,7 @@ const allowedTransitions: Record<CaseStatus, CaseStatus[]> = {
 
 @Injectable()
 export class CasesService {
-  constructor(private auditService: AuditService) {}
+  constructor(private auditService: AuditService, private legalSafety: LegalSafetyService) {}
 
   getAllowedTransitions(status: CaseStatus): CaseStatus[] {
     return allowedTransitions[status] ?? [];
@@ -292,8 +293,8 @@ export class CasesService {
     if (!caseRecord) {
       throw new NotFoundException('Case not found');
     }
-
     const suggestion = this.deriveTriageSuggestion(caseRecord, input);
+    this.legalSafety.validateStructuredSuggestion(suggestion);
 
     const updatedCase = await prisma.$transaction(async (tx) => {
       const record = await tx.case.update({
@@ -343,7 +344,8 @@ export class CasesService {
       mappedTierLevel: suggestion.mappedTierLevel,
       rationale: suggestion.rationale,
       confidence: suggestion.confidence,
-      escalates: suggestion.escalates
+      escalates: suggestion.escalates,
+      disclaimer: this.legalSafety.disclaimer
     };
   }
 

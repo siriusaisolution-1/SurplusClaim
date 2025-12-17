@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { NavBar } from '../components/NavBar';
 import { API_BASE_URL } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
+import { formatSafeLabel } from '../lib/safety';
 
 type DocumentStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -236,7 +237,7 @@ export default function PortalPage() {
                   SHA256: {doc.sha256}
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.35rem', color: '#e5e7eb' }}>
-                  <span>Doc type: {doc.docType ?? doc.aiDocType ?? 'Unlabeled'}</span>
+                  <span>Doc type: {formatSafeLabel(doc.docType ?? doc.aiDocType)}</span>
                   {doc.aiConfidence && <span>AI confidence: {(doc.aiConfidence * 100).toFixed(1)}%</span>}
                 </div>
               </div>

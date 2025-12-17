@@ -7,6 +7,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { AuditService } from '../audit/audit.service';
 import { prisma } from '../prisma/prisma.client';
 import { RulesService } from '../rules/rules.service';
+import { LegalSafetyService } from '../safety/legal-safety.service';
 
 export interface DocumentUploadResult {
   document: any;
@@ -17,7 +18,11 @@ export type DocumentStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 @Injectable()
 export class DocumentsService {
-  constructor(private readonly auditService: AuditService, private readonly rulesService: RulesService) {}
+  constructor(
+    private readonly auditService: AuditService,
+    private readonly rulesService: RulesService,
+    private readonly legalSafety: LegalSafetyService
+  ) {}
 
   private buildObjectKey(caseRef: string, originalName: string) {
     const safeName = originalName.replace(/\s+/g, '-').toLowerCase();
@@ -44,11 +49,25 @@ export class DocumentsService {
     return caseRecord;
   }
 
-  private inferDocTypeFromRules(caseRecord: any, originalName: string, provided?: string) {
-    if (provided) {
-      return { docType: provided, confidence: 1 };
+  private getAllowedDocTypes(caseRecord: any) {
+    const jurisdiction = (caseRecord.metadata as any)?.jurisdiction;
+    if (!jurisdiction?.state || !jurisdiction?.county_code) {
+      return [] as string[];
     }
 
+    try {
+      const checklist = this.rulesService.buildChecklist({
+        case_ref: caseRecord.caseRef,
+        state: jurisdiction.state,
+        county_code: jurisdiction.county_code
+      });
+      return checklist.items.filter((item) => item.type === 'document').map((item) => item.id);
+    } catch (err) {
+      return [] as string[];
+    }
+  }
+
+  private inferDocTypeFromRules(caseRecord: any, originalName: string, allowedDocTypes: string[]) {
     const jurisdiction = (caseRecord.metadata as any)?.jurisdiction;
     if (!jurisdiction?.state || !jurisdiction?.county_code) {
       return { docType: null, confidence: null };
@@ -66,7 +85,9 @@ export class DocumentsService {
         (item) => lowerName.includes(item.id.toLowerCase()) || lowerName.includes(item.title.toLowerCase())
       );
       if (match) {
-        return { docType: match.id, confidence: 0.68 };
+        return allowedDocTypes.includes(match.id)
+          ? { docType: match.id, confidence: 0.68 }
+          : { docType: null, confidence: null };
       }
     } catch (err) {
       return { docType: null, confidence: null };
@@ -131,10 +152,14 @@ export class DocumentsService {
 
     const caseRecord = await this.findCaseOrThrow(params.tenantId, params.caseRef);
     const objectKey = this.buildObjectKey(caseRecord.caseRef, params.file.originalname);
+    const allowedDocTypes = this.getAllowedDocTypes(caseRecord);
+    const providedDocType = params.docType
+      ? this.legalSafety.validateDocType(params.docType, allowedDocTypes)
+      : undefined;
 
     await this.persistFile(objectKey, params.file.buffer);
     const hash = this.sha256(params.file.buffer);
-    const aiGuess = this.inferDocTypeFromRules(caseRecord, params.file.originalname, params.docType);
+    const aiGuess = this.inferDocTypeFromRules(caseRecord, params.file.originalname, allowedDocTypes);
 
     const document = await prisma.document.create({
       data: {
@@ -144,7 +169,7 @@ export class DocumentsService {
         objectKey,
         originalFilename: params.file.originalname,
         sha256: hash,
-        docType: params.docType ?? aiGuess.docType,
+        docType: providedDocType ?? aiGuess.docType,
         aiDocType: aiGuess.docType,
         aiConfidence: aiGuess.confidence,
         status: 'PENDING'
@@ -204,6 +229,12 @@ export class DocumentsService {
       throw new NotFoundException('Document not found');
     }
 
+    const caseRecord = await this.findCaseOrThrow(params.tenantId, params.caseRef);
+    const allowedDocTypes = this.getAllowedDocTypes(caseRecord);
+    const updatedDocType = params.docType
+      ? this.legalSafety.validateDocType(params.docType, allowedDocTypes)
+      : undefined;
+
     const updated = await prisma.document.update({
       where: { id: document.id },
       data: {
@@ -211,7 +242,7 @@ export class DocumentsService {
         reviewNote: params.note ?? null,
         reviewerId: params.actorId,
         reviewedAt: new Date(),
-        ...(params.docType ? { docType: params.docType } : {})
+        ...(updatedDocType ? { docType: updatedDocType } : {})
       }
     });
 
