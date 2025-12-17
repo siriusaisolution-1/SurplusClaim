@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 
 import { AuditController } from './audit/audit.controller';
 import { AuditService } from './audit/audit.service';
 import { AuthController } from './auth/auth.controller';
 import { AuthGuard } from './auth/auth.guard';
+import { RateLimitGuard } from './auth/rate-limit.guard';
 import { AuthService } from './auth/auth.service';
 import { CasesController } from './cases/cases.controller';
 import { CasePackageController } from './cases/case-package.controller';
@@ -28,6 +29,8 @@ import { PayoutsController } from './payouts/payouts.controller';
 import { PayoutsService } from './payouts/payouts.service';
 import { FeeCalculatorService } from './payouts/fee-calculator.service';
 import { LegalSafetyService } from './safety/legal-safety.service';
+import { LoggingInterceptor } from './observability/logging.interceptor';
+import { StructuredLoggerService } from './observability/structured-logger.service';
 
 @Module({
   imports: [ConnectorsModule],
@@ -59,9 +62,18 @@ import { LegalSafetyService } from './safety/legal-safety.service';
     PayoutsService,
     FeeCalculatorService,
     LegalSafetyService,
+    StructuredLoggerService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LoggingInterceptor
+    },
     {
       provide: APP_GUARD,
       useClass: AuthGuard
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard
     }
   ]
 })

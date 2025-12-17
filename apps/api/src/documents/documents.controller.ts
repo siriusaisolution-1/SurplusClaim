@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Param, Post, UploadedFile, UseInterceptors, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import multer from 'multer';
 
 import { CurrentUser, Roles } from '../auth/auth.decorators';
 import { DocumentStatus, DocumentsService } from './documents.service';
+import { MAX_UPLOAD_BYTES, uploadFileFilter } from './upload.config';
 
 @Controller('cases/:caseRef/documents')
 export class DocumentsController {
@@ -16,7 +18,13 @@ export class DocumentsController {
 
   @Post('upload')
   @Roles('TENANT_ADMIN', 'REVIEWER', 'OPS', 'B2B_CLIENT')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: multer.memoryStorage(),
+      limits: { fileSize: MAX_UPLOAD_BYTES },
+      fileFilter: uploadFileFilter
+    })
+  )
   async upload(
     @Param('caseRef') caseRef: string,
     @UploadedFile() file: Express.Multer.File,
