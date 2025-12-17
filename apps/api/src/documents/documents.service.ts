@@ -2,12 +2,13 @@ import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { AuditService } from '../audit/audit.service';
 import { prisma } from '../prisma/prisma.client';
 import { RulesService } from '../rules/rules.service';
 import { LegalSafetyService } from '../safety/legal-safety.service';
+import { validateFileInput } from './upload.config';
 
 export interface DocumentUploadResult {
   document: any;
@@ -146,9 +147,7 @@ export class DocumentsService {
     file: Express.Multer.File | undefined;
     docType?: string;
   }): Promise<DocumentUploadResult> {
-    if (!params.file) {
-      throw new BadRequestException('No file provided');
-    }
+    validateFileInput(params.file);
 
     const caseRecord = await this.findCaseOrThrow(params.tenantId, params.caseRef);
     const objectKey = this.buildObjectKey(caseRecord.caseRef, params.file.originalname);

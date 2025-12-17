@@ -1,12 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { AuditEngine, VerificationRange, VerificationResult } from '@surplus/audit';
 
 import { prisma } from '../prisma/prisma.client';
+import { StructuredLoggerService } from '../observability/structured-logger.service';
 
 @Injectable()
 export class AuditService {
-  private readonly logger = new Logger(AuditService.name);
   private readonly engine = new AuditEngine(prisma);
+
+  constructor(private readonly logger: StructuredLoggerService) {}
 
   async logAction(params: {
     tenantId: string;
