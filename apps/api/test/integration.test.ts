@@ -74,7 +74,7 @@ async function seedTenants() {
     data: {
       tenantId: tenantA.id,
       caseRef: 'CASE-A-001',
-      status: 'NEW',
+      status: 'DISCOVERED',
       tierSuggested: 'MEDIUM',
       assignedReviewerId: reviewerA.id
     }
@@ -84,7 +84,7 @@ async function seedTenants() {
     data: {
       tenantId: tenantB.id,
       caseRef: 'CASE-B-001',
-      status: 'IN_REVIEW',
+      status: 'TRIAGED',
       tierSuggested: 'HIGH',
       assignedReviewerId: adminB.id
     }

@@ -24,6 +24,9 @@ import { ConsentService } from './consent/consent.service';
 import { DocumentsController } from './documents/documents.controller';
 import { DocumentsService } from './documents/documents.service';
 import { CasePackageService } from './cases/case-package.service';
+import { PayoutsController } from './payouts/payouts.controller';
+import { PayoutsService } from './payouts/payouts.service';
+import { FeeCalculatorService } from './payouts/fee-calculator.service';
 
 @Module({
   imports: [ConnectorsModule],
@@ -38,7 +41,8 @@ import { CasePackageService } from './cases/case-package.service';
     RulesController,
     CommunicationsController,
     ConsentController,
-    DocumentsController
+    DocumentsController,
+    PayoutsController
   ],
   providers: [
     AuditService,
@@ -51,6 +55,8 @@ import { CasePackageService } from './cases/case-package.service';
     CommunicationsService,
     ConsentService,
     DocumentsService,
+    PayoutsService,
+    FeeCalculatorService,
     {
       provide: APP_GUARD,
       useClass: AuthGuard

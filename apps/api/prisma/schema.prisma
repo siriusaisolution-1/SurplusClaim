@@ -59,6 +59,7 @@ model Tenant {
   users           User[]
   cases           Case[]
   feeAgreements   FeeAgreement[]
+  invoices        Invoice[]
   auditLogEntries AuditLog[]
 
   @@unique([name])
@@ -103,6 +104,7 @@ model Case {
   consents         Consent[]
   communications   Communication[]
   payouts          Payout[]
+  invoices         Invoice[]
   auditTrail       AuditLog[]
 
   @@unique([tenantId, caseRef])
@@ -246,10 +248,17 @@ model Payout {
   status         String
   reference      String?
   processedAt    DateTime?
+  confirmedAt    DateTime?
+  confirmedBy    String?
+  evidenceKey    String?
+  feeCents       Int?
+  feeRateBps     Int?
+  metadata       Json?
   createdAt      DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
   case   Case   @relation(fields: [caseId], references: [id])
+  invoice Invoice? @relation("InvoicePayout")
 
   @@index([tenantId, caseRef])
   @@index([tenantId, status])
@@ -263,6 +272,8 @@ model FeeAgreement {
   capAmountCents Int?
   minFeeCents    Int?
   b2bOverride    Int?
+  stateCode      String?
+  contractRef    String?
   notes          String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -270,6 +281,31 @@ model FeeAgreement {
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId, tierMin, tierMax])
+  @@index([tenantId, stateCode])
+  @@index([tenantId, contractRef])
+}
+
+model Invoice {
+  id          String   @id @default(uuid())
+  tenantId    String
+  caseId      String
+  caseRef     String
+  payoutId    String?
+  amountCents Int
+  feeRateBps  Int?
+  currency    String   @default("USD")
+  status      String   @default("PENDING")
+  issuedAt    DateTime @default(now())
+  dueAt       DateTime?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  case   Case   @relation(fields: [caseId], references: [id])
+  payout Payout? @relation("InvoicePayout", fields: [payoutId], references: [id])
+
+  @@index([tenantId, caseRef])
+  @@index([tenantId, status])
 }
 
 model Session {

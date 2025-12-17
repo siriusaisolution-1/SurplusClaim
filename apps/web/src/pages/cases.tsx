@@ -171,9 +171,38 @@ interface CommunicationRecord {
   createdAt: string;
 }
 
+interface PayoutRecord {
+  id: string;
+  amountCents: number;
+  currency: string;
+  status: string;
+  reference?: string | null;
+  feeCents?: number | null;
+  feeRateBps?: number | null;
+  evidenceKey?: string | null;
+  processedAt?: string | null;
+  confirmedAt?: string | null;
+  createdAt: string;
+}
+
+interface InvoiceRecord {
+  id: string;
+  amountCents: number;
+  feeRateBps?: number | null;
+  currency: string;
+  status: string;
+  issuedAt: string;
+  metadata?: Record<string, unknown> | null;
+}
+
 const formatTierLabel = (tier?: string | null) => {
   if (!tier) return 'Unassigned';
   return TIER_LABELS[tier] ?? tier;
+};
+
+const formatCurrency = (amountCents?: number | null) => {
+  if (amountCents === null || amountCents === undefined) return '—';
+  return `$${(amountCents / 100).toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;
 };
 
 export default function CasesPage() {
@@ -216,6 +245,16 @@ export default function CasesPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadDocType, setUploadDocType] = useState('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [payoutSummary, setPayoutSummary] = useState<{
+    latestPayout: PayoutRecord | null;
+    latestInvoice: InvoiceRecord | null;
+  }>({ latestPayout: null, latestInvoice: null });
+  const [payoutAmount, setPayoutAmount] = useState('');
+  const [payoutReference, setPayoutReference] = useState('');
+  const [payoutNote, setPayoutNote] = useState('');
+  const [payoutEvidence, setPayoutEvidence] = useState<File | null>(null);
+  const [payoutStatus, setPayoutStatus] = useState<string | null>(null);
+  const [closeAfterPayout, setCloseAfterPayout] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -265,6 +304,11 @@ export default function CasesPage() {
   useEffect(() => {
     if (!selectedRef || !accessToken) return;
     void fetchDocuments(selectedRef);
+  }, [selectedRef, accessToken]);
+
+  useEffect(() => {
+    if (!selectedRef || !accessToken) return;
+    void fetchPayouts(selectedRef);
   }, [selectedRef, accessToken]);
 
   const fetchJurisdictions = async () => {
@@ -424,6 +468,28 @@ export default function CasesPage() {
     }
   };
 
+  const fetchPayouts = async (caseRef: string) => {
+    if (!accessToken) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/cases/${caseRef}/payouts`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+
+      if (!response.ok) {
+        throw new Error('Unable to load payouts');
+      }
+
+      const payload = await response.json();
+      setPayoutSummary({
+        latestPayout: payload.latestPayout ?? null,
+        latestInvoice: payload.latestInvoice ?? null
+      });
+      setPayoutStatus(null);
+    } catch (err: any) {
+      setPayoutStatus(err.message ?? 'Unable to load payout summary');
+    }
+  };
+
   const handleDocumentUpload = async () => {
     if (!selectedRef || !accessToken) {
       setDocumentError('Select a case before uploading');
@@ -541,6 +607,48 @@ export default function CasesPage() {
       await fetchCaseDetail(selectedRef);
     } catch (err: any) {
       setSubmissionStatus(err.message ?? 'Failed to record submission');
+    }
+  };
+
+  const handleConfirmPayout = async () => {
+    if (!accessToken || !selectedRef) return;
+    const parsedAmount = Math.round(parseFloat(payoutAmount || '0') * 100);
+    if (!parsedAmount || Number.isNaN(parsedAmount)) {
+      setPayoutStatus('Enter a valid payout amount');
+      return;
+    }
+
+    setPayoutStatus('Confirming payout...');
+    try {
+      const formData = new FormData();
+      formData.append('amountCents', parsedAmount.toString());
+      if (payoutReference) formData.append('reference', payoutReference);
+      if (payoutNote) formData.append('note', payoutNote);
+      if (payoutEvidence) formData.append('evidence', payoutEvidence);
+      if (closeAfterPayout) formData.append('closeCase', 'true');
+
+      const response = await fetch(`${API_BASE_URL}/cases/${selectedRef}/payouts/confirm`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(errorBody.message ?? 'Unable to confirm payout');
+      }
+
+      const payload = await response.json();
+      setPayoutSummary({ latestInvoice: payload.invoice ?? null, latestPayout: payload.payout ?? null });
+      setPayoutStatus('Payout confirmed and invoice drafted.');
+      setPayoutEvidence(null);
+      setPayoutAmount('');
+      setPayoutReference('');
+      setPayoutNote('');
+      await fetchCaseDetail(selectedRef);
+      await fetchPayouts(selectedRef);
+    } catch (err: any) {
+      setPayoutStatus(err.message ?? 'Unable to confirm payout');
     }
   };
 
@@ -722,6 +830,8 @@ export default function CasesPage() {
   };
 
   const formattedCaseList = useMemo(() => caseList, [caseList]);
+  const latestInvoice = payoutSummary.latestInvoice;
+  const latestPayout = payoutSummary.latestPayout;
 
   if (!user) return <div className="main-shell" />;
 
@@ -1240,6 +1350,119 @@ export default function CasesPage() {
                           Mark submitted with evidence
                         </button>
                         {submissionStatus && <div style={{ color: '#9ca3af' }}>{submissionStatus}</div>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '1.25rem' }}>
+                  <h4>Payout confirmation & success fee</h4>
+                  <p style={{ color: '#9ca3af', marginTop: '-0.25rem' }}>
+                    Success fees are calculated only after payout confirmation. State caps, minimums, and B2B overrides are applied automatically and logged.
+                  </p>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1.2fr 0.8fr',
+                      gap: '1rem',
+                      alignItems: 'start'
+                    }}
+                  >
+                    <div style={{ background: '#0b1320', padding: '0.75rem', borderRadius: '8px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <label className="input-label">Payout amount (USD)</label>
+                          <input
+                            className="input"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={payoutAmount}
+                            onChange={(e) => setPayoutAmount(e.target.value)}
+                            placeholder="e.g., 12500.00"
+                          />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <label className="input-label">Reference</label>
+                          <input
+                            className="input"
+                            value={payoutReference}
+                            onChange={(e) => setPayoutReference(e.target.value)}
+                            placeholder="Check number or ACH reference"
+                          />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', marginTop: '0.5rem', gap: '0.5rem' }}>
+                        <label className="input-label">Internal note</label>
+                        <textarea
+                          className="input"
+                          rows={2}
+                          value={payoutNote}
+                          onChange={(e) => setPayoutNote(e.target.value)}
+                          placeholder="Notes about caps, overrides, or jurisdictional nuances"
+                        />
+                        <label className="input-label">Evidence upload (required for confirmation)</label>
+                        <input
+                          className="input"
+                          type="file"
+                          onChange={(e) => setPayoutEvidence(e.target.files ? e.target.files[0] : null)}
+                        />
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#9ca3af' }}>
+                          <input
+                            type="checkbox"
+                            checked={closeAfterPayout}
+                            onChange={(e) => setCloseAfterPayout(e.target.checked)}
+                          />
+                          Close case after payout confirmation
+                        </label>
+                        <button className="button" onClick={handleConfirmPayout} disabled={!payoutEvidence}>
+                          Confirm payout and generate invoice
+                        </button>
+                        {payoutStatus && <div style={{ color: '#9ca3af' }}>{payoutStatus}</div>}
+                      </div>
+                    </div>
+                    <div style={{ background: '#0b1320', padding: '0.75rem', borderRadius: '8px' }}>
+                      <strong>Latest invoice & audit trail</strong>
+                      <div style={{ color: '#9ca3af', marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                        {latestInvoice ? (
+                          <>
+                            <div>Invoice: {latestInvoice.id}</div>
+                            <div>Amount due: {formatCurrency(latestInvoice.amountCents)}</div>
+                            <div>
+                              Rate applied: {latestInvoice.feeRateBps ? `${(latestInvoice.feeRateBps / 100).toFixed(2)}%` : '—'}
+                            </div>
+                            <div>Status: <span className="tag">{latestInvoice.status}</span></div>
+                            <div>Issued: {new Date(latestInvoice.issuedAt).toLocaleString()}</div>
+                            {latestInvoice.metadata?.cap && (
+                              <div>Cap enforced: {formatCurrency(latestInvoice.metadata.cap as number)}</div>
+                            )}
+                            {latestInvoice.metadata?.min && (
+                              <div>Minimum enforced: {formatCurrency(latestInvoice.metadata.min as number)}</div>
+                            )}
+                          </>
+                        ) : (
+                          <div>No invoice drafted yet.</div>
+                        )}
+                        <div style={{ marginTop: '0.75rem' }}>
+                          <strong>Last payout</strong>
+                          {latestPayout ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
+                              <div>Amount: {formatCurrency(latestPayout.amountCents)}</div>
+                              <div>Fee: {formatCurrency(latestPayout.feeCents ?? null)}</div>
+                              <div>Reference: {latestPayout.reference ?? '—'}</div>
+                              <div>Evidence: {latestPayout.evidenceKey ?? '—'}</div>
+                              <div>Status: <span className="tag">{latestPayout.status}</span></div>
+                              <div>
+                                Confirmed:{' '}
+                                {latestPayout.confirmedAt
+                                  ? new Date(latestPayout.confirmedAt).toLocaleString()
+                                  : 'Pending'}
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ color: '#9ca3af' }}>No payout confirmation recorded.</div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
