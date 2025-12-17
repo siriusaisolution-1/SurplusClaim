@@ -51,6 +51,11 @@ interface CaseTimelineEvent {
   createdAt: string;
 }
 
+interface CaseDeadline {
+  name: string;
+  dueDate: string;
+}
+
 interface AuditLogEntrySnippet {
   id: string;
   action: string;
@@ -72,6 +77,8 @@ interface CaseDetailResponse {
     updatedAt: string;
   };
   timeline: CaseTimelineEvent[];
+  reminderHistory: CaseTimelineEvent[];
+  nextDeadline: CaseDeadline | null;
   auditTrail: AuditLogEntrySnippet[];
   allowedTransitions: CaseStatus[];
 }
@@ -198,6 +205,11 @@ export default function CasesPage() {
   const [communicationError, setCommunicationError] = useState<string | null>(null);
   const [sendAt, setSendAt] = useState('');
   const [communicationHistory, setCommunicationHistory] = useState<CommunicationRecord[]>([]);
+  const [submissionDate, setSubmissionDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [submissionChannel, setSubmissionChannel] = useState<string>('');
+  const [submissionNotes, setSubmissionNotes] = useState<string>('');
+  const [submissionFile, setSubmissionFile] = useState<File | null>(null);
+  const [submissionStatus, setSubmissionStatus] = useState<string | null>(null);
   const [documents, setDocuments] = useState<CaseDocument[]>([]);
   const [documentError, setDocumentError] = useState<string | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
@@ -324,6 +336,9 @@ export default function CasesPage() {
       setSelectedRef(payload.case.caseRef);
       setTransitionTarget('');
       setTransitionReason('');
+      setSubmissionStatus(null);
+      setSubmissionFile(null);
+      setSubmissionDate(new Date().toISOString().slice(0, 10));
     } catch (err: any) {
       setError(err.message ?? 'Unable to load case detail');
     } finally {
@@ -494,6 +509,38 @@ export default function CasesPage() {
       }
     } catch (err: any) {
       setDocumentError(err.message ?? 'Unable to review document');
+    }
+  };
+
+  const handleMarkSubmitted = async () => {
+    if (!accessToken || !selectedRef) return;
+    if (!submissionFile) {
+      setSubmissionStatus('Upload submission evidence before marking submitted.');
+      return;
+    }
+
+    setSubmissionStatus('Submitting...');
+    try {
+      const formData = new FormData();
+      formData.append('file', submissionFile);
+      if (submissionDate) formData.append('submittedAt', submissionDate);
+      if (submissionChannel) formData.append('channel', submissionChannel);
+      if (submissionNotes) formData.append('notes', submissionNotes);
+
+      const response = await fetch(`${API_BASE_URL}/cases/${selectedRef}/submission`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Unable to record submission');
+      }
+
+      setSubmissionStatus('Submission recorded with evidence.');
+      await fetchCaseDetail(selectedRef);
+    } catch (err: any) {
+      setSubmissionStatus(err.message ?? 'Failed to record submission');
     }
   };
 
@@ -1111,6 +1158,91 @@ export default function CasesPage() {
                   ) : (
                     <p style={{ color: '#9ca3af' }}>Select a jurisdiction with available rules.</p>
                   )}
+                </div>
+
+                <div style={{ marginTop: '1.25rem' }}>
+                  <h4>Submission coordination</h4>
+                  <p style={{ color: '#9ca3af', marginTop: '-0.25rem' }}>
+                    Deadlines are informational; reminders are email-only and never auto-submit filings.
+                  </p>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1.1fr 0.9fr',
+                      gap: '1rem',
+                      alignItems: 'start'
+                    }}
+                  >
+                    <div style={{ background: '#0b1320', padding: '0.75rem', borderRadius: '8px' }}>
+                      <strong>Next procedural deadline</strong>
+                      <div style={{ color: '#9ca3af', marginTop: '0.25rem' }}>
+                        {selectedCase.nextDeadline ? (
+                          <>
+                            {selectedCase.nextDeadline.name} ·{' '}
+                            {new Date(selectedCase.nextDeadline.dueDate).toLocaleString()}
+                          </>
+                        ) : (
+                          'No upcoming deadline detected from procedural metadata.'
+                        )}
+                      </div>
+                      <div style={{ marginTop: '0.75rem' }}>
+                        <strong>Reminder history</strong>
+                        <div style={{ color: '#9ca3af', fontSize: '0.95rem' }}>
+                          {selectedCase.reminderHistory.length === 0 && 'No reminders logged yet.'}
+                          {selectedCase.reminderHistory.length > 0 && (
+                            <ul style={{ paddingLeft: '1.2rem', marginTop: '0.35rem' }}>
+                              {[...selectedCase.reminderHistory]
+                                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                                .map((event) => (
+                                  <li key={event.id}>
+                                    <span className="tag">{event.type}</span>{' '}
+                                    {event.payload?.deadlineName ?? event.payload?.deadline_name ?? 'deadline'} ·{' '}
+                                    {new Date(event.createdAt).toLocaleString()}
+                                  </li>
+                                ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ background: '#0b1320', padding: '0.75rem', borderRadius: '8px' }}>
+                      <strong>Mark case submitted (manual only)</strong>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        <label className="input-label">Submitted at</label>
+                        <input
+                          className="input"
+                          type="datetime-local"
+                          value={submissionDate}
+                          onChange={(e) => setSubmissionDate(e.target.value)}
+                        />
+                        <label className="input-label">Submission channel</label>
+                        <input
+                          className="input"
+                          placeholder="e.g., mail, eFile"
+                          value={submissionChannel}
+                          onChange={(e) => setSubmissionChannel(e.target.value)}
+                        />
+                        <label className="input-label">Notes</label>
+                        <textarea
+                          className="input"
+                          placeholder="Internal notes"
+                          value={submissionNotes}
+                          onChange={(e) => setSubmissionNotes(e.target.value)}
+                          rows={2}
+                        />
+                        <label className="input-label">Evidence upload</label>
+                        <input
+                          className="input"
+                          type="file"
+                          onChange={(e) => setSubmissionFile(e.target.files ? e.target.files[0] : null)}
+                        />
+                        <button className="button" onClick={handleMarkSubmitted} disabled={!submissionFile}>
+                          Mark submitted with evidence
+                        </button>
+                        {submissionStatus && <div style={{ color: '#9ca3af' }}>{submissionStatus}</div>}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div style={{ marginTop: '1.25rem' }}>

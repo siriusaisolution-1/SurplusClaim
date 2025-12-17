@@ -112,6 +112,29 @@ export class CasesService {
     return allowedTransitions[status] ?? [];
   }
 
+  private extractProceduralDeadlines(metadata: Record<string, unknown> | null) {
+    if (!metadata) return [] as { name: string; dueDate: Date }[];
+    const deadlines = (metadata as any)?.procedural?.deadlines ?? [];
+    if (!Array.isArray(deadlines)) return [] as { name: string; dueDate: Date }[];
+
+    return deadlines
+      .map((item: any) => {
+        const parsed = item?.dueDate ? new Date(item.dueDate) : item?.due_date ? new Date(item.due_date) : null;
+        if (!parsed || Number.isNaN(parsed.getTime())) {
+          return null;
+        }
+        return { name: item.name ?? 'deadline', dueDate: parsed };
+      })
+      .filter(Boolean) as { name: string; dueDate: Date }[];
+  }
+
+  private pickNextDeadline(deadlines: { name: string; dueDate: Date }[]) {
+    const now = new Date();
+    const upcoming = deadlines.filter((item) => item.dueDate.getTime() >= now.getTime());
+    if (upcoming.length === 0) return null;
+    return upcoming.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())[0];
+  }
+
   private deriveTriageSuggestion(
     caseRecord: any,
     input: TriageSuggestInput
@@ -556,7 +579,13 @@ export class CasesService {
       caseRecord,
       events,
       auditTrail,
-      allowedTransitions: this.getAllowedTransitions(caseRecord.status)
+      allowedTransitions: this.getAllowedTransitions(caseRecord.status),
+      reminderHistory: events
+        .filter((event) =>
+          ['DEADLINE_REMINDER_SCHEDULED', 'DEADLINE_REMINDER_SENT'].includes(event.type)
+        )
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()),
+      nextDeadline: this.pickNextDeadline(this.extractProceduralDeadlines(caseRecord.metadata as any))
     };
   }
 }
