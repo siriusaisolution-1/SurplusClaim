@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build --no-lint",
+    "build": "pnpm --filter @surplus/shared --workspace-root build && next build --no-lint",
     "start": "next start",
     "lint": "next lint",
     "test": "node ./test/legal-safety.test.js",
