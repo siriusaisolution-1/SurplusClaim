@@ -1,5 +1,6 @@
 import { NormalizedCase } from '@surplus/shared';
 
+import { connectorKeyToString } from './registry';
 import {
   ConnectorAuditEvent,
   ConnectorConfig,
@@ -7,7 +8,6 @@ import {
   ConnectorRunStatus,
   StoredCaseRecord
 } from './types';
-import { connectorKeyToString } from './registry';
 
 const EMPTY_STATUS: ConnectorRunStatus = {
   extracted: 0,

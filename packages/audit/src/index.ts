@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+
 import { AuditLog, PrismaClient } from '@prisma/client';
 
 type Primitive = string | number | boolean | null;

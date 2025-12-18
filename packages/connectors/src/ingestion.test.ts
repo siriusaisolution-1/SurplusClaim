@@ -1,11 +1,11 @@
+import { generateCaseRef } from '@surplus/shared';
 import { describe, expect, it } from 'vitest';
 
-import { generateCaseRef } from '@surplus/shared';
-
-import { ConnectorRegistry } from './registry';
 import { ConnectorOrchestrator } from './orchestrator';
-import { ConnectorConfig, ConnectorScrapedItem } from './types';
+import { ConnectorRegistry } from './registry';
+import { ScrapydClient } from './scrapyd-client';
 import { ConnectorStateStore } from './state';
+import { ConnectorConfig, ConnectorScrapedItem } from './types';
 
 class FakeScrapydClient {
   private jobCounter = 0;
@@ -58,7 +58,7 @@ describe('Connector ingestion pipeline', () => {
     const orchestrator = new ConnectorOrchestrator({
       registry,
       stateStore: state,
-      scrapydClient: new FakeScrapydClient(items) as unknown as any
+      scrapydClient: new FakeScrapydClient(items) as unknown as ScrapydClient
     });
 
     await orchestrator.runConnector(connector);
@@ -95,7 +95,7 @@ describe('Connector ingestion pipeline', () => {
     const orchestrator = new ConnectorOrchestrator({
       registry,
       stateStore: state,
-      scrapydClient: new FakeScrapydClient(items) as unknown as any
+      scrapydClient: new FakeScrapydClient(items) as unknown as ScrapydClient
     });
 
     await expect(orchestrator.runConnector(connector)).rejects.toThrow();
