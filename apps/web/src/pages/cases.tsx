@@ -402,8 +402,8 @@ export default function CasesPage() {
         jurisdiction.county_name ||
         jurisdictions.find(
           (item) =>
-            item.state.toUpperCase() === jurisdiction.state.toUpperCase() &&
-            item.county_code.toUpperCase() === jurisdiction.county_code.toUpperCase()
+            item.state.toUpperCase() === jurisdiction.state?.toUpperCase() &&
+            item.county_code.toUpperCase() === jurisdiction.county_code?.toUpperCase()
         )?.county_name;
 
       return {
@@ -1312,7 +1312,12 @@ export default function CasesPage() {
                                 .map((event) => (
                                   <li key={event.id}>
                                     <span className="tag">{event.type}</span>{' '}
-                                    {event.payload?.deadlineName ?? event.payload?.deadline_name ?? 'deadline'} ·{' '}
+                                    {typeof event.payload?.deadlineName === 'string'
+                                      ? event.payload.deadlineName
+                                      : typeof event.payload?.deadline_name === 'string'
+                                        ? event.payload.deadline_name
+                                        : 'deadline'}{' '}
+                                    ·{' '}
                                     {new Date(event.createdAt).toLocaleString()}
                                   </li>
                                 ))}
