@@ -3,7 +3,8 @@
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "dist",
-    "declaration": true
+    "declaration": true,
+    "types": ["node", "js-yaml"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
