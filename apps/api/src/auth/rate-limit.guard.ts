@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { CanActivate, ExecutionContext, Injectable, TooManyRequestsException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, BadRequestException } from '@nestjs/common';
 
 import { StructuredLoggerService } from '../observability/structured-logger.service';
 
@@ -43,7 +43,7 @@ export class RateLimitGuard implements CanActivate {
         requestId,
         retryAfterSeconds
       });
-      throw new TooManyRequestsException('Rate limit exceeded for tenant');
+      throw new BadRequestException('Rate limit exceeded for tenant');
     }
 
     return true;

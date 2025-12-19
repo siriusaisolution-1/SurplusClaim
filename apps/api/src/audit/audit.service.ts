@@ -27,8 +27,9 @@ export class AuditService {
         caseRef: params.caseRef,
         caseId: params.caseId ?? null
       });
-    } catch (error) {
-      this.logger.error('Failed to append to audit log', error as Error);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error('Failed to append to audit log', message);
     }
   }
 

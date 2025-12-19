@@ -144,7 +144,7 @@ export class DocumentsService {
     tenantId: string;
     actorId: string;
     caseRef: string;
-    file: Express.Multer.File | undefined;
+    file: Express.Multer.File;
     docType?: string;
   }): Promise<DocumentUploadResult> {
     validateFileInput(params.file);
@@ -274,8 +274,8 @@ export class DocumentsService {
       }
     });
 
-    const caseRecord = await this.findCaseOrThrow(params.tenantId, params.caseRef);
-    const checklist = await this.buildChecklistProgress(caseRecord);
+    const caseRecordAfterReview = await this.findCaseOrThrow(params.tenantId, params.caseRef);
+    const checklist = await this.buildChecklistProgress(caseRecordAfterReview);
     return { document: updated, checklist };
   }
 

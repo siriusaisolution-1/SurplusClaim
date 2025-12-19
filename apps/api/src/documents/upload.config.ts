@@ -24,7 +24,7 @@ export function validateFileInput(file: Express.Multer.File | undefined) {
   }
 }
 
-export function uploadFileFilter(_req: any, file: Express.Multer.File, cb: FileFilterCallback) {
+export function uploadFileFilter(_req: any, file: any, cb: FileFilterCallback) {
   try {
     validateFileInput(file);
     cb(null, true);

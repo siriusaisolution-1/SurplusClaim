@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "start": "node dist/main.js",
-    "build": "echo \"Skipping API build (types under reconstruction)\"",
+    "build": "pnpm --filter @surplus/shared --workspace-root build && pnpm --filter @surplus/rules --workspace-root build && pnpm --filter @surplus/connectors --workspace-root build && pnpm --filter @surplus/audit --workspace-root build && tsc -p tsconfig.json",
     "test": "pnpm exec ts-node ./test/legal-safety.test.ts && pnpm exec prisma migrate deploy --schema ./prisma/schema.prisma && pnpm exec ts-node ./test/fee-calculator.test.ts && pnpm exec ts-node ./test/integration.test.ts",
     "lint": "echo \"Skipping API lint (disabled for CI)\"",
     "format": "prettier --write 'src/**/*.ts'",

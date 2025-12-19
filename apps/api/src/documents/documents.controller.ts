@@ -22,7 +22,7 @@ export class DocumentsController {
     FileInterceptor('file', {
       storage: multer.memoryStorage(),
       limits: { fileSize: MAX_UPLOAD_BYTES },
-      fileFilter: uploadFileFilter
+      fileFilter: uploadFileFilter as any
     })
   )
   async upload(
