@@ -144,7 +144,7 @@ export class DocumentsService {
     tenantId: string;
     actorId: string;
     caseRef: string;
-    file: Express.Multer.File | undefined;
+    file: Express.Multer.File;
     docType?: string;
   }): Promise<DocumentUploadResult> {
     validateFileInput(params.file);
@@ -274,8 +274,8 @@ export class DocumentsService {
       }
     });
 
-    const caseRecord = await this.findCaseOrThrow(params.tenantId, params.caseRef);
-    const checklist = await this.buildChecklistProgress(caseRecord);
+    const caseRecordAfterReview = await this.findCaseOrThrow(params.tenantId, params.caseRef);
+    const checklist = await this.buildChecklistProgress(caseRecordAfterReview);
     return { document: updated, checklist };
   }
 
@@ -288,11 +288,13 @@ export class DocumentsService {
     const caseRecord = await this.findCaseOrThrow(tenantId, caseRef);
     const documents = await prisma.document.findMany({ where: { tenantId, caseId: caseRecord.id } });
 
-    return items.map((item) => {
+    return items.map((item: any) => {
       if (item.type === 'document') {
         return {
           ...item,
-          completed: documents.some((doc) => this.documentMatches(doc, item.id) && doc.status !== 'REJECTED')
+          completed: documents.some(
+            (doc: any) => this.documentMatches(doc, item.id) && doc.status !== 'REJECTED'
+          )
         };
       }
       return { ...item, completed: false };

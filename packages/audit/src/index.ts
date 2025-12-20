@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
-import { AuditLog, PrismaClient } from '@prisma/client';
+
+import { PrismaClient } from '@prisma/client';
 
 type Primitive = string | number | boolean | null;
 
-function canonicalize(value: unknown): Primitive | Primitive[] | Record<string, Primitive | Primitive[] | Record<string, unknown>> {
+function canonicalize(value: unknown): unknown {
   if (value === null || value === undefined) return null;
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return value;
@@ -50,7 +51,7 @@ export interface VerificationResult {
   isValid: boolean;
   checked: number;
   brokenRecord?: {
-    record: AuditLog;
+    record: unknown;
     expectedHash: string;
     expectedPrevHash: string;
     index: number;
@@ -67,7 +68,7 @@ export class AuditEngine {
     payload?: Record<string, unknown>;
     caseRef?: string;
     caseId?: string | null;
-  }): Promise<AuditLog> {
+  }): Promise<unknown> {
     const prev = await this.prisma.auditLog.findFirst({
       where: { tenantId: params.tenantId },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]

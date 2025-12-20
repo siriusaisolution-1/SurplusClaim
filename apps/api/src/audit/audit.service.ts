@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AuditEngine, VerificationRange, VerificationResult } from '@surplus/audit';
+import { AuditLog } from '@prisma/client';
 
 import { prisma } from '../prisma/prisma.client';
 import { StructuredLoggerService } from '../observability/structured-logger.service';
@@ -27,8 +28,9 @@ export class AuditService {
         caseRef: params.caseRef,
         caseId: params.caseId ?? null
       });
-    } catch (error) {
-      this.logger.error('Failed to append to audit log', error as Error);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error('Failed to append to audit log', message);
     }
   }
 
@@ -42,6 +44,6 @@ export class AuditService {
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }]
     });
 
-    return records.map((record) => JSON.stringify(record)).join('\n');
+    return records.map((record: AuditLog) => JSON.stringify(record)).join('\n');
   }
 }

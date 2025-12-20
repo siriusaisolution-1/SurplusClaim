@@ -38,7 +38,7 @@ export class CasesController {
       total: response.total,
       page: response.page,
       pageSize: response.pageSize,
-      cases: response.data.map((item) => ({
+      cases: response.data.map((item: any) => ({
         id: item.id,
         caseRef: item.caseRef,
         status: item.status,

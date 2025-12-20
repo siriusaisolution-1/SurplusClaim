@@ -2,13 +2,20 @@
   "name": "@surplus/connectors",
   "version": "0.1.0",
   "private": true,
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "pnpm --filter @surplus/shared --workspace-root build && tsc -p tsconfig.json",
     "dev": "tsc -w -p tsconfig.json",
     "test": "vitest run",
-    "lint": "eslint 'src/**/*.ts'",
+    "lint": "pnpm --filter @surplus/shared --workspace-root build && eslint 'src/**/*.ts'",
     "format": "prettier --write 'src/**/*.ts'"
   },
   "dependencies": {

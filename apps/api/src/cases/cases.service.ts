@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common';
-import { CaseStatus, TierLevel } from '@prisma/client';
+import { CaseStatus, Prisma, TierLevel } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { prisma } from '../prisma/prisma.client';
@@ -238,7 +238,7 @@ export class CasesService {
       throw new ConflictException('Case with this reference already exists');
     }
 
-    const createdCase = await prisma.$transaction(async (tx) => {
+    const createdCase = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const caseRecord = await tx.case.create({
         data: {
           tenantId,
@@ -296,7 +296,7 @@ export class CasesService {
     const suggestion = this.deriveTriageSuggestion(caseRecord, input);
     this.legalSafety.validateStructuredSuggestion(suggestion);
 
-    const updatedCase = await prisma.$transaction(async (tx) => {
+    const updatedCase = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const record = await tx.case.update({
         where: { id: caseRecord.id },
         data: { tierSuggested: suggestion.mappedTierLevel }
@@ -372,7 +372,7 @@ export class CasesService {
 
     const shouldEscalate = input.tier === 'TIER_C' && caseRecord.status !== CaseStatus.ESCALATED;
 
-    const updatedCase = await prisma.$transaction(async (tx) => {
+    const updatedCase = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const record = await tx.case.update({
         where: { id: caseRecord.id },
         data: {
@@ -583,10 +583,13 @@ export class CasesService {
       auditTrail,
       allowedTransitions: this.getAllowedTransitions(caseRecord.status),
       reminderHistory: events
-        .filter((event) =>
+        .filter((event: { type: string }) =>
           ['DEADLINE_REMINDER_SCHEDULED', 'DEADLINE_REMINDER_SENT'].includes(event.type)
         )
-        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()),
+        .sort(
+          (a: { createdAt: Date }, b: { createdAt: Date }) =>
+            a.createdAt.getTime() - b.createdAt.getTime()
+        ),
       nextDeadline: this.pickNextDeadline(this.extractProceduralDeadlines(caseRecord.metadata as any))
     };
   }

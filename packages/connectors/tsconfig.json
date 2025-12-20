@@ -1,8 +1,13 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "rootDir": "./src",
     "outDir": "dist",
-    "lib": ["ES2020", "DOM"]
+    "declaration": true,
+    "lib": ["ES2020", "DOM"],
+    "paths": {
+      "@surplus/shared": ["../shared/dist"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

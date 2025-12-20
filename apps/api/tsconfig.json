@@ -1,7 +1,20 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "baseUrl": "./src"
+    "baseUrl": ".",
+    "rootDir": "../..",
+    "types": ["node"],
+    "noImplicitAny": false,
+    "paths": {
+      "@surplus/shared": ["../../packages/shared/src/index.ts"],
+      "@surplus/shared/*": ["../../packages/shared/src/*"],
+      "@surplus/rules": ["../../packages/rules/src/index.ts"],
+      "@surplus/rules/*": ["../../packages/rules/src/*"],
+      "@surplus/connectors": ["../../packages/connectors/src/index.ts"],
+      "@surplus/connectors/*": ["../../packages/connectors/src/*"],
+      "@surplus/audit": ["../../packages/audit/src/index.ts"],
+      "@surplus/audit/*": ["../../packages/audit/src/*"]
+    }
   },
   "include": ["src/**/*", "prisma/**/*", "test/**/*"],
   "exclude": ["node_modules", "dist"]

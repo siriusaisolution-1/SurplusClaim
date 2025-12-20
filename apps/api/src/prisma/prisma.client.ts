@@ -4,7 +4,7 @@ const prisma = new PrismaClient({
   log: ['warn', 'error']
 });
 
-prisma.$use(async (params, next) => {
+prisma.$use(async (params: any, next: (params: any) => Promise<any>) => {
   if (
     params.model === 'AuditLog' &&
     ['update', 'updateMany', 'delete', 'deleteMany', 'upsert'].includes(params.action)

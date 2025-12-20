@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { AI_OUTPUT_RULES, UPL_DISCLAIMER } from '../../../packages/shared/src/upl';
+import { AI_OUTPUT_RULES, UPL_DISCLAIMER } from '@surplus/shared';
 
 import { LegalSafetyService } from '../src/safety/legal-safety.service';
 

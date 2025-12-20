@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { CaseStatus } from '@prisma/client';
+import { CaseStatus, Prisma } from '@prisma/client';
 import PDFDocument from 'pdfkit';
 import { createHash, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
@@ -85,7 +85,7 @@ export class ConsentService {
       signedAt
     });
 
-    const { artifact, consent, updatedCase } = await prisma.$transaction(async (tx) => {
+    const { artifact, consent, updatedCase } = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const objectKey = this.buildObjectKey(payload.caseRef, payload.version);
       const artifactRecord = await tx.artifact.create({
         data: {

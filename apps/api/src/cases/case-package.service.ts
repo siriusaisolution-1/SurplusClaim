@@ -57,7 +57,7 @@ export class CasePackageService {
     };
   }
 
-  private renderFooter(doc: PDFDocument, text: string) {
+  private renderFooter(doc: any, text: string) {
     const bottom = doc.page.height - doc.page.margins.bottom + 10;
     doc
       .fontSize(8)

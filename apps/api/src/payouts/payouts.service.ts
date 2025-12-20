@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { CaseStatus, FeeAgreement, TierLevel } from '@prisma/client';
+import { CaseStatus, FeeAgreement, Prisma, TierLevel } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { CasesService } from '../cases/cases.service';
@@ -65,7 +65,7 @@ export class PayoutsService {
     const tierIndex = tierBand === 'TIER_A' ? 0 : tierBand === 'TIER_B' ? 1 : 2;
     const tierValue = orderedTiers[tierIndex];
 
-    const match = agreements.find((agreement) => {
+    const match = agreements.find((agreement: FeeAgreement) => {
       const minIdx = orderedTiers.indexOf(agreement.tierMin);
       const maxIdx = orderedTiers.indexOf(agreement.tierMax);
       const targetIdx = orderedTiers.indexOf(tierValue);
@@ -139,7 +139,7 @@ export class PayoutsService {
       ? await this.persistEvidence(evidenceKey as string, params.evidenceFile.buffer)
       : null;
 
-    const { payout, invoice } = await prisma.$transaction(async (tx) => {
+    const { payout, invoice } = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const payoutRecord = await tx.payout.create({
         data: {
           tenantId: params.tenantId,

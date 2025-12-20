@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { validateCaseRef } from './caseRef';
 
 type Primitive = string | number | boolean | null;
@@ -118,11 +119,11 @@ function sortKeys(value: unknown): unknown {
   return value as Primitive | Record<string, unknown>;
 }
 
-export interface CanonicalAuditEvent extends AuditEvent {
+export type CanonicalAuditEvent = Omit<AuditEvent, 'occurred_at' | 'context' | 'payload'> & {
   occurred_at: string;
   context?: Record<string, unknown>;
   payload?: Record<string, unknown>;
-}
+};
 
 export function canonicalizeAuditEvent(input: unknown): CanonicalAuditEvent {
   const parsed = AuditEventSchema.parse(input);
