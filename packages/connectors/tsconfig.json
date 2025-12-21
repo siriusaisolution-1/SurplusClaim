@@ -1,13 +1,12 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "./src",
-    "outDir": "dist",
+    "composite": true,
     "declaration": true,
-    "lib": ["ES2020", "DOM"],
-    "paths": {
-      "@surplus/shared": ["../shared/dist"]
-    }
+    "declarationMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "lib": ["ES2022", "DOM"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
