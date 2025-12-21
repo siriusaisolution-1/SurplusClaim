@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import { randomBytes } from 'crypto';
 
 export interface CaseRefParts {
   state: string;
@@ -27,7 +27,7 @@ function toYyyyMmDd(date: string | Date): string {
 }
 
 function randomBlock(length: number): string {
-  const bytes = crypto.randomBytes(length);
+  const bytes = randomBytes(length);
   let output = '';
 
   for (let i = 0; i < length; i += 1) {
