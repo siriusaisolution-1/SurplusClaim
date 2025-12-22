@@ -23,7 +23,9 @@ jobs:
         run: corepack enable
 
       - name: Prepare pnpm
-        run: corepack prepare pnpm@9.15.1 --activate
+        run: |
+          corepack prepare pnpm@9.15.1 --activate
+          echo "$HOME/.local/share/pnpm" >> $GITHUB_PATH
 
       - name: Show pnpm version
         run: pnpm -v
