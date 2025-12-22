@@ -1,9 +1,10 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { AuditEngine } from '@surplus/audit';
 import { CommunicationDirection, CommunicationChannel } from '@prisma/client';
+import { AuditEngine } from '@surplus/audit';
+
+import { prisma } from '../prisma.client';
 
 import { buildEmailProvider } from './email.provider';
-import { prisma } from '../prisma.client';
 
 const DEFAULT_POLL_MS = 60_000;
 

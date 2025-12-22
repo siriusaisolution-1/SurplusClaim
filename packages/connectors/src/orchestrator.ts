@@ -1,7 +1,7 @@
-import { ConnectorRegistry } from './registry';
 import { CaseIngestionService } from './ingestion';
-import { ConnectorStateStore, defaultConnectorStateStore } from './state';
+import { ConnectorRegistry } from './registry';
 import { ScrapydClient } from './scrapyd-client';
+import { ConnectorStateStore, defaultConnectorStateStore } from './state';
 import { ConnectorAuditEvent, ConnectorConfig } from './types';
 
 export interface OrchestratorOptions {

@@ -1,7 +1,7 @@
 import type { AppProps } from 'next/app';
 
-import { AuthProvider } from '../lib/auth-context';
 import { ComplianceNotice } from '../components/ComplianceNotice';
+import { AuthProvider } from '../lib/auth-context';
 
 import './styles.css';
 

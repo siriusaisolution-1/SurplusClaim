@@ -1,4 +1,5 @@
 import { z } from 'zod';
+
 import { validateCaseRef } from './caseRef';
 
 type Primitive = string | number | boolean | null;

@@ -1,4 +1,4 @@
-import { UPL_DISCLAIMER, UPL_UI_NOTICE } from '@surplus/shared';
+import { UPL_DISCLAIMER, UPL_UI_NOTICE } from '../lib/upl';
 
 export function ComplianceNotice() {
   return (

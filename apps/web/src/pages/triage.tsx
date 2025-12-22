@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
+import { useEffect, useMemo, useState } from 'react';
 
 import { NavBar } from '../components/NavBar';
 import { API_BASE_URL } from '../lib/api';
@@ -34,6 +34,9 @@ const CASE_STATUSES = [
 ] as const;
 
 export type CaseStatus = (typeof CASE_STATUSES)[number];
+
+const toMessage = (err: unknown, fallback: string) =>
+  err instanceof Error && err.message ? err.message : fallback;
 
 interface CaseSummary {
   id: string;
@@ -100,8 +103,8 @@ export default function TriagePage() {
       setCaseList(payload.cases ?? []);
       setSelectedCase(payload.cases?.[0] ?? null);
       setSuggestion(null);
-    } catch (err: any) {
-      setError(err.message ?? 'Unable to load triage inbox');
+    } catch (err: unknown) {
+      setError(toMessage(err, 'Unable to load triage inbox'));
     } finally {
       setLoadingList(false);
     }
@@ -141,8 +144,8 @@ export default function TriagePage() {
         throw new Error('AI output blocked because it did not pass compliance validation');
       }
       setSuggestion(guarded);
-    } catch (err: any) {
-      setError(err.message ?? 'Unable to suggest tier');
+    } catch (err: unknown) {
+      setError(toMessage(err, 'Unable to suggest tier'));
     } finally {
       setLoadingSuggestion(false);
     }
@@ -188,8 +191,8 @@ export default function TriagePage() {
       setNotes('');
       setPartnerHandoff({ partnerName: '', contact: '', summary: '' });
       await fetchCases();
-    } catch (err: any) {
-      setError(err.message ?? 'Unable to confirm tier');
+    } catch (err: unknown) {
+      setError(toMessage(err, 'Unable to confirm tier'));
     } finally {
       setLoadingConfirm(false);
     }

@@ -1,20 +1,19 @@
+import { generateCaseRef } from '@surplus/shared';
 import { describe, expect, it } from 'vitest';
 
-import { generateCaseRef } from '@surplus/shared';
-
-import { ConnectorRegistry } from './registry';
 import { ConnectorOrchestrator } from './orchestrator';
-import { ConnectorConfig, ConnectorScrapedItem } from './types';
+import { ConnectorRegistry } from './registry';
 import { ConnectorStateStore } from './state';
+import { ConnectorConfig, ConnectorScrapedItem } from './types';
 
 class FakeScrapydClient {
   private jobCounter = 0;
 
   constructor(private readonly items: ConnectorScrapedItem[]) {}
 
-  async scheduleSpider(): Promise<string> {
+  async scheduleSpider(spider: string): Promise<string> {
     this.jobCounter += 1;
-    return `job-${this.jobCounter}`;
+    return `${spider}-job-${this.jobCounter}`;
   }
 
   async fetchItems(): Promise<ConnectorScrapedItem[]> {
@@ -58,7 +57,7 @@ describe('Connector ingestion pipeline', () => {
     const orchestrator = new ConnectorOrchestrator({
       registry,
       stateStore: state,
-      scrapydClient: new FakeScrapydClient(items) as unknown as any
+      scrapydClient: new FakeScrapydClient(items)
     });
 
     await orchestrator.runConnector(connector);
@@ -95,7 +94,7 @@ describe('Connector ingestion pipeline', () => {
     const orchestrator = new ConnectorOrchestrator({
       registry,
       stateStore: state,
-      scrapydClient: new FakeScrapydClient(items) as unknown as any
+      scrapydClient: new FakeScrapydClient(items)
     });
 
     await expect(orchestrator.runConnector(connector)).rejects.toThrow();

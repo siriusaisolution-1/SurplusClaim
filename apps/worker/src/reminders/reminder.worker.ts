@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { CaseStatus, CommunicationChannel, CommunicationDirection } from '@prisma/client';
 import { AuditEngine } from '@surplus/audit';
 import { templateRegistry } from '@surplus/shared';
-import { CaseStatus, CommunicationChannel, CommunicationDirection } from '@prisma/client';
 
 import { prisma } from '../prisma.client';
 
@@ -138,20 +138,24 @@ export class ReminderWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private extractDeadlines(metadata: Record<string, unknown> | null): ProceduralDeadline[] {
-    if (!metadata) return [];
-    const rawDeadlines = (metadata as any)?.procedural?.deadlines ?? [];
+    const procedural = (metadata ?? {}) as { procedural?: { deadlines?: unknown } };
+    const rawDeadlines = procedural.procedural?.deadlines;
     if (!Array.isArray(rawDeadlines)) return [];
 
     return rawDeadlines
       .map((item) => {
-        const dueDateValue = (item as any).dueDate ?? (item as any).due_date;
-        const parsed = dueDateValue ? new Date(dueDateValue) : null;
+        if (!item || typeof item !== 'object') return null;
+        const record = item as Record<string, unknown>;
+        const dueDateValue = record.dueDate ?? record.due_date;
+        const parsed =
+          typeof dueDateValue === 'string' || dueDateValue instanceof Date ? new Date(dueDateValue) : null;
         if (!parsed || Number.isNaN(parsed.getTime())) {
           return null;
         }
-        return { name: (item as any).name ?? 'deadline', dueDate: parsed } as ProceduralDeadline;
+        const name = typeof record.name === 'string' ? record.name : 'deadline';
+        return { name, dueDate: parsed };
       })
-      .filter(Boolean) as ProceduralDeadline[];
+      .filter((value): value is ProceduralDeadline => Boolean(value));
   }
 
   private pickNextDeadline(deadlines: ProceduralDeadline[]): ProceduralDeadline | null {
@@ -172,4 +176,3 @@ export class ReminderWorkerService implements OnModuleInit, OnModuleDestroy {
     return threeDaysBefore;
   }
 }
-

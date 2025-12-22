@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { useEffect, useMemo, useState } from 'react';
 
 import { NavBar } from '../components/NavBar';
-import { useAuth } from '../lib/auth-context';
 import { API_BASE_URL } from '../lib/api';
+import { useAuth } from '../lib/auth-context';
 import { formatSafeLabel, sanitizeDocType } from '../lib/safety';
 
 const CASE_STATUSES = [
@@ -32,6 +32,9 @@ const TIER_LABELS: Record<string, string> = {
   TIER_B: 'Tier B (intermediate)',
   TIER_C: 'Tier C (escalation)'
 };
+
+const toMessage = (err: unknown, fallback: string) =>
+  err instanceof Error && err.message ? err.message : fallback;
 
 interface CaseSummary {
   id: string;
@@ -325,9 +328,9 @@ export default function CasesPage() {
 
       const payload = await response.json();
       setJurisdictions(payload.jurisdictions ?? []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setRulesError(err.message ?? 'Unable to load jurisdictions');
+      setRulesError(toMessage(err, 'Unable to load jurisdictions'));
     }
   };
 
@@ -354,8 +357,8 @@ export default function CasesPage() {
       const payload = await response.json();
       setCaseList(payload.cases);
       setTotal(payload.total);
-    } catch (err: any) {
-      setError(err.message ?? 'Unable to load cases');
+    } catch (err: unknown) {
+      setError(toMessage(err, 'Unable to load cases'));
     } finally {
       setLoadingList(false);
     }
@@ -384,18 +387,18 @@ export default function CasesPage() {
       setSubmissionStatus(null);
       setSubmissionFile(null);
       setSubmissionDate(new Date().toISOString().slice(0, 10));
-    } catch (err: any) {
-      setError(err.message ?? 'Unable to load case detail');
+    } catch (err: unknown) {
+      setError(toMessage(err, 'Unable to load case detail'));
     } finally {
       setLoadingDetail(false);
     }
   };
 
   const deriveJurisdiction = (payload: CaseDetailResponse): JurisdictionSummary | null => {
-    const metadata = payload.case.metadata as any;
-    const jurisdiction = metadata?.jurisdiction as
-      | { state?: string; county_code?: string; county_name?: string }
+    const metadata = payload.case.metadata as
+      | { jurisdiction?: { state?: string; county_code?: string; county_name?: string } }
       | undefined;
+    const jurisdiction = metadata?.jurisdiction;
 
     if (jurisdiction?.state && jurisdiction?.county_code) {
       const fallbackCountyName =
@@ -439,8 +442,8 @@ export default function CasesPage() {
       const payload = await response.json();
       setRuleDetails(payload.rule ?? null);
       setChecklistItems(payload.checklist?.items ?? []);
-    } catch (err: any) {
-      setRulesError(err.message ?? 'Unable to load jurisdiction rules');
+    } catch (err: unknown) {
+      setRulesError(toMessage(err, 'Unable to load jurisdiction rules'));
       setRuleDetails(null);
       setChecklistItems([]);
     } finally {
@@ -464,8 +467,8 @@ export default function CasesPage() {
       if (payload.checklist?.items) {
         setChecklistItems(payload.checklist.items);
       }
-    } catch (err: any) {
-      setDocumentError(err.message ?? 'Unable to load documents');
+    } catch (err: unknown) {
+      setDocumentError(toMessage(err, 'Unable to load documents'));
     }
   };
 
@@ -486,8 +489,8 @@ export default function CasesPage() {
         latestInvoice: payload.latestInvoice ?? null
       });
       setPayoutStatus(null);
-    } catch (err: any) {
-      setPayoutStatus(err.message ?? 'Unable to load payout summary');
+    } catch (err: unknown) {
+      setPayoutStatus(toMessage(err, 'Unable to load payout summary'));
     }
   };
 
@@ -546,8 +549,8 @@ export default function CasesPage() {
         xhr.onerror = () => reject(new Error('Upload failed'));
         xhr.send(formData);
       });
-    } catch (err: any) {
-      setDocumentError(err.message ?? 'Upload failed');
+    } catch (err: unknown) {
+      setDocumentError(toMessage(err, 'Upload failed'));
     } finally {
       setUploadingDoc(false);
     }
@@ -574,8 +577,8 @@ export default function CasesPage() {
       if (payload.checklist?.items) {
         setChecklistItems(payload.checklist.items);
       }
-    } catch (err: any) {
-      setDocumentError(err.message ?? 'Unable to review document');
+    } catch (err: unknown) {
+      setDocumentError(toMessage(err, 'Unable to review document'));
     }
   };
 
@@ -606,8 +609,8 @@ export default function CasesPage() {
 
       setSubmissionStatus('Submission recorded with evidence.');
       await fetchCaseDetail(selectedRef);
-    } catch (err: any) {
-      setSubmissionStatus(err.message ?? 'Failed to record submission');
+    } catch (err: unknown) {
+      setSubmissionStatus(toMessage(err, 'Failed to record submission'));
     }
   };
 
@@ -648,8 +651,8 @@ export default function CasesPage() {
       setPayoutNote('');
       await fetchCaseDetail(selectedRef);
       await fetchPayouts(selectedRef);
-    } catch (err: any) {
-      setPayoutStatus(err.message ?? 'Unable to confirm payout');
+    } catch (err: unknown) {
+      setPayoutStatus(toMessage(err, 'Unable to confirm payout'));
     }
   };
 
@@ -667,9 +670,9 @@ export default function CasesPage() {
 
       const payload = await response.json();
       setTemplates(payload.templates ?? []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setCommunicationError(err.message ?? 'Unable to load templates');
+      setCommunicationError(toMessage(err, 'Unable to load templates'));
     } finally {
       setLoadingTemplates(false);
     }
@@ -688,9 +691,9 @@ export default function CasesPage() {
 
       const payload = await response.json();
       setCommunicationHistory(payload ?? []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setCommunicationError(err.message ?? 'Unable to load communications');
+      setCommunicationError(toMessage(err, 'Unable to load communications'));
     }
   };
 
@@ -745,9 +748,9 @@ export default function CasesPage() {
       const payload = await response.json();
       setCommunicationPreview(payload.preview);
       setCommunicationStatus('Preview ready');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setCommunicationError(err.message ?? 'Unable to prepare communication');
+      setCommunicationError(toMessage(err, 'Unable to prepare communication'));
       setCommunicationStatus(null);
     }
   };
@@ -790,9 +793,9 @@ export default function CasesPage() {
 
       await fetchCommunicationHistory(selectedCase.case.caseRef);
       setCommunicationStatus('Queued for delivery');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setCommunicationError(err.message ?? 'Unable to queue communication');
+      setCommunicationError(toMessage(err, 'Unable to queue communication'));
       setCommunicationStatus(null);
     }
   };
@@ -823,8 +826,8 @@ export default function CasesPage() {
 
       await fetchCaseDetail(selectedCase.case.caseRef);
       void fetchCases(page);
-    } catch (err: any) {
-      setError(err.message ?? 'Transition failed');
+    } catch (err: unknown) {
+      setError(toMessage(err, 'Transition failed'));
     } finally {
       setLoadingDetail(false);
     }
