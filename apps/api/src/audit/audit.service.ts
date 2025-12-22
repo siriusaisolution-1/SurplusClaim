@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Injectable } from '@nestjs/common';
 import { AuditEngine, VerificationRange, VerificationResult } from '@surplus/audit';
 

@@ -1,6 +1,6 @@
-import { FormEvent, useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { FormEvent, useEffect, useState } from 'react';
 
 import { useAuth } from '../lib/auth-context';
 

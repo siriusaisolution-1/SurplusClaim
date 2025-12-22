@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
 
 import { NavBar } from '../components/NavBar';
 import { API_BASE_URL } from '../lib/api';
@@ -42,6 +42,9 @@ export default function PortalPage() {
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  const toMessage = (err: unknown, fallback: string) =>
+    err instanceof Error && err.message ? err.message : fallback;
+
   useEffect(() => {
     if (!loading && !user) {
       void router.replace('/login');
@@ -61,8 +64,8 @@ export default function PortalPage() {
       const payload = await response.json();
       setDocuments(payload.documents ?? []);
       setChecklist(payload.checklist?.items ?? []);
-    } catch (err: any) {
-      setError(err.message ?? 'Unable to load documents');
+    } catch (err: unknown) {
+      setError(toMessage(err, 'Unable to load documents'));
     }
   };
 
@@ -115,8 +118,8 @@ export default function PortalPage() {
       setUploadFile(null);
       setUploadDocType('');
       await fetchDocuments();
-    } catch (err: any) {
-      setError(err.message ?? 'Upload failed');
+    } catch (err: unknown) {
+      setError(toMessage(err, 'Upload failed'));
     } finally {
       setUploading(false);
     }

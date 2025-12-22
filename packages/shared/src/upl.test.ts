@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { templateRegistry } from './communications/templates';
 import { generateCaseRef } from './caseRef';
+import { templateRegistry } from './communications/templates';
 import { AI_OUTPUT_RULES, UPL_DISCLAIMER, UPL_UI_NOTICE } from './upl';
 
 const VALID_CASE_REF = generateCaseRef({ state: 'GA', countycode: 'FUL', date: '2024-01-01' });

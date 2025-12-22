@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 
 import { NormalizedCase, NormalizedCaseSchema, generateCaseRef } from '@surplus/shared';
 
-import { ConnectorConfig, ConnectorScrapedItem } from './types';
 import { CaseBuilderInput, ConnectorStateStore, IngestionResult } from './state';
+import { ConnectorConfig, ConnectorScrapedItem } from './types';
 
 function asDateString(value?: string): string {
   if (!value) {

@@ -1,4 +1,4 @@
-import { AI_OUTPUT_RULES, UPL_DISCLAIMER } from '@surplus/shared';
+import { AI_OUTPUT_RULES, UPL_DISCLAIMER } from './upl';
 
 export function guardSuggestionResponse<T extends { rationale: string[]; disclaimer?: string }>(
   payload: T | null

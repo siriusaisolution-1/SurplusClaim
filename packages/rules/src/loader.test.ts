@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { ChecklistGenerator } from './checklist';
-import { JurisdictionRuleSchema } from './schemas';
 import { RulesRegistry } from './loader';
+import { JurisdictionRuleSchema } from './schemas';
 
 describe('RulesRegistry', () => {
   it('loads jurisdictions from YAML configs', () => {

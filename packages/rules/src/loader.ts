@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+
 import yaml from 'js-yaml';
 
 import { ChecklistItem, JurisdictionRule, JurisdictionRuleSchema, getDefaultRulesDirectory } from './schemas';
