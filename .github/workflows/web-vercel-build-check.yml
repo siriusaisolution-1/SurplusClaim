@@ -19,11 +19,14 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - name: Enable Corepack and pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@9.12.3 --activate
-          pnpm -v
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Prepare pnpm
+        run: corepack prepare pnpm@8.15.4 --activate
+
+      - name: Show pnpm version
+        run: pnpm -v
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
