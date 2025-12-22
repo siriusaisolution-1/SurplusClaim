@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
+import Link from 'next/link';
 
 import { NavBar } from '../components/NavBar';
 import { useAuth } from '../lib/auth-context';
@@ -16,7 +17,36 @@ export default function Home() {
   }, [loading, user, router]);
 
   if (!user) {
-    return <div className="main-shell" />;
+    return (
+      <div className="main-shell">
+        <Head>
+          <title>Surplus Claim</title>
+        </Head>
+        <div className="content-shell">
+          <div className="panel">
+            <h1>Surplus Claim</h1>
+            <p style={{ color: '#9ca3af', marginTop: '0.5rem' }}>
+              Sign in to continue to the dashboard.
+            </p>
+            <Link
+              href="/login"
+              style={{
+                display: 'inline-block',
+                marginTop: '1rem',
+                padding: '0.5rem 1rem',
+                background: '#0ea5e9',
+                color: '#0b1224',
+                borderRadius: '0.375rem',
+                fontWeight: 600,
+                textDecoration: 'none'
+              }}
+            >
+              Go to Login
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
