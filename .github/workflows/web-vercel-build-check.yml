@@ -23,7 +23,7 @@ jobs:
         run: corepack enable
 
       - name: Prepare pnpm
-        run: corepack prepare pnpm@8.15.4 --activate
+        run: corepack prepare pnpm@9.15.1 --activate
 
       - name: Show pnpm version
         run: pnpm -v
