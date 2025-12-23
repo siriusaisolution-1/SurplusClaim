@@ -17,18 +17,29 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
 
       - name: Enable Corepack
         run: corepack enable
 
       - name: Prepare pnpm
         run: |
-          corepack prepare pnpm@9.15.1 --activate
+          corepack prepare pnpm@8.15.4 --activate
           echo "$HOME/.local/share/pnpm" >> $GITHUB_PATH
 
       - name: Show pnpm version
         run: pnpm -v
+
+      - name: Determine pnpm store path
+        id: pnpm-store
+        run: echo "PNPM_STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
