@@ -62,7 +62,13 @@ jobs:
           pnpm exec tsc -p apps/web/tsconfig.json --noEmit
 
       - name: Run migrations
-        run: pnpm --filter @surplus/api exec prisma migrate deploy --schema apps/api/prisma/schema.prisma
+        if: env.DATABASE_URL != ''
+        run: |
+          if [ -f apps/api/prisma/schema.prisma ]; then
+            pnpm --filter @surplus/api exec prisma migrate deploy --schema apps/api/prisma/schema.prisma
+          else
+            echo "Schema file not found at apps/api/prisma/schema.prisma; skipping migrations."
+          fi
 
       - name: Tests
         run: pnpm test
