@@ -8,6 +8,7 @@
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "format": "pnpm -r format",
+    "prisma:generate": "pnpm --filter @surplus/api prisma:generate",
     "build:web": "pnpm --filter @surplus/web build",
     "dev:web": "pnpm --filter @surplus/web dev",
     "lint:web": "pnpm --filter @surplus/web lint",

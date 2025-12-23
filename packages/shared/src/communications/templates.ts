@@ -268,5 +268,3 @@ export const templateRegistry = new TemplateRegistry([
     }
   }
 ]);
-
-export { DISCLAIMER };

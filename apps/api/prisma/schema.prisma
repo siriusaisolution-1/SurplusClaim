@@ -58,9 +58,16 @@ model Tenant {
 
   users           User[]
   cases           Case[]
+  caseEvents      CaseEvent[]
+  artifacts       Artifact[]
+  documents       Document[]
+  consents        Consent[]
+  communications  Communication[]
+  payouts         Payout[]
   feeAgreements   FeeAgreement[]
   invoices        Invoice[]
   auditLogEntries AuditLog[]
+  sessions        Session[]
 
   @@unique([name])
 }
@@ -208,8 +215,9 @@ model Consent {
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id])
   case     Case     @relation(fields: [caseId], references: [id])
-  artifact Artifact @relation(fields: [consentArtifactId], references: [id])
+  artifact Artifact? @relation(fields: [consentArtifactId], references: [id])
 
+  @@unique([consentArtifactId])
   @@index([tenantId, caseRef])
 }
 
@@ -306,6 +314,7 @@ model Invoice {
 
   @@index([tenantId, caseRef])
   @@index([tenantId, status])
+  @@unique([payoutId])
 }
 
 model Session {

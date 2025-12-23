@@ -1,10 +1,8 @@
 import { createHash } from 'node:crypto';
 
-import { AuditLog, PrismaClient } from '@prisma/client';
+import { AuditLog, Prisma, PrismaClient } from '@prisma/client';
 
-type Primitive = string | number | boolean | null;
-
-function canonicalize(value: unknown): Primitive | Primitive[] | Record<string, Primitive | Primitive[] | Record<string, unknown>> {
+function canonicalize(value: unknown): Prisma.JsonValue {
   if (value === null || value === undefined) return null;
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return value;
@@ -13,11 +11,11 @@ function canonicalize(value: unknown): Primitive | Primitive[] | Record<string, 
     return value.toISOString();
   }
   if (Array.isArray(value)) {
-    return value.map((item) => canonicalize(item)) as Primitive[];
+    return value.map((item) => canonicalize(item)) as Prisma.JsonValue[];
   }
   if (typeof value === 'object') {
     const sortedKeys = Object.keys(value as Record<string, unknown>).sort();
-    return sortedKeys.reduce<Record<string, unknown>>((acc, key) => {
+    return sortedKeys.reduce<Record<string, Prisma.JsonValue>>((acc, key) => {
       acc[key] = canonicalize((value as Record<string, unknown>)[key]);
       return acc;
     }, {});
@@ -93,7 +91,7 @@ export class AuditEngine {
         caseRef: params.caseRef ?? 'GENERAL',
         actorId: params.actor ?? null,
         action: params.eventType,
-        metadata: payload,
+        metadata: payload as Prisma.InputJsonValue,
         hash,
         prevHash: prev?.hash ?? null,
         createdAt

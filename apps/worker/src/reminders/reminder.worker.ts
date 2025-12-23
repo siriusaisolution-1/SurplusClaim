@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { CaseStatus, CommunicationChannel, CommunicationDirection } from '@prisma/client';
+import { CaseStatus, CommunicationChannel, CommunicationDirection, Prisma } from '@prisma/client';
 import { AuditEngine } from '@surplus/audit';
 import { templateRegistry } from '@surplus/shared';
 
@@ -34,12 +34,17 @@ export class ReminderWorkerService implements OnModuleInit, OnModuleDestroy {
     const cases = await prisma.case.findMany({
       where: {
         status: { notIn: [CaseStatus.CLOSED, CaseStatus.PAYOUT_CONFIRMED] },
-        metadata: { not: null }
+        NOT: [
+          { metadata: { equals: Prisma.DbNull } },
+          { metadata: { equals: Prisma.JsonNull } }
+        ]
       },
       include: { assignedReviewer: true }
     });
 
-    for (const caseRecord of cases) {
+    type CaseWithReviewer = Prisma.CaseGetPayload<{ include: { assignedReviewer: true } }>;
+
+    for (const caseRecord of cases as CaseWithReviewer[]) {
       const deadlines = this.extractDeadlines(caseRecord.metadata as Record<string, unknown> | null);
       const next = this.pickNextDeadline(deadlines);
       if (!next) {

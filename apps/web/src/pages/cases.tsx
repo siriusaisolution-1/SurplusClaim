@@ -400,19 +400,22 @@ export default function CasesPage() {
       | undefined;
     const jurisdiction = metadata?.jurisdiction;
 
-    if (jurisdiction?.state && jurisdiction?.county_code) {
+    const state = jurisdiction?.state;
+    const countyCode = jurisdiction?.county_code;
+
+    if (state && countyCode) {
       const fallbackCountyName =
-        jurisdiction.county_name ||
+        jurisdiction?.county_name ||
         jurisdictions.find(
           (item) =>
-            item.state.toUpperCase() === jurisdiction.state.toUpperCase() &&
-            item.county_code.toUpperCase() === jurisdiction.county_code.toUpperCase()
+            item.state.toUpperCase() === state.toUpperCase() &&
+            item.county_code.toUpperCase() === countyCode.toUpperCase()
         )?.county_name;
 
       return {
-        state: jurisdiction.state,
-        county_code: jurisdiction.county_code,
-        county_name: fallbackCountyName ?? jurisdiction.county_code,
+        state,
+        county_code: countyCode,
+        county_name: fallbackCountyName ?? countyCode,
         enabled: true,
         feature_flags: { enabled: true, notes: 'Derived from case metadata' }
       };
@@ -1315,7 +1318,7 @@ export default function CasesPage() {
                                 .map((event) => (
                                   <li key={event.id}>
                                     <span className="tag">{event.type}</span>{' '}
-                                    {event.payload?.deadlineName ?? event.payload?.deadline_name ?? 'deadline'} ·{' '}
+                                    {String(event.payload?.deadlineName ?? event.payload?.deadline_name ?? 'deadline')} ·{' '}
                                     {new Date(event.createdAt).toLocaleString()}
                                   </li>
                                 ))}
