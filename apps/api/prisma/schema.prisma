@@ -51,7 +51,7 @@ enum CommunicationChannel {
 }
 
 model Tenant {
-  id          String   @id @default(uuid())
+  id          String   @id @default(uuid()) @db.Uuid
   name        String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -74,7 +74,7 @@ model Tenant {
 
 model User {
   id        String   @id @default(uuid())
-  tenantId  String
+  tenantId  String @db.Uuid
   email     String
   fullName  String
   passwordHash String
@@ -93,7 +93,7 @@ model User {
 
 model Case {
   id                 String    @id @default(uuid())
-  tenantId           String
+  tenantId           String @db.Uuid
   caseRef            String
   status             CaseStatus
   tierSuggested      TierLevel
@@ -121,7 +121,7 @@ model Case {
 
 model CaseEvent {
   id        String   @id @default(uuid())
-  tenantId  String
+  tenantId  String @db.Uuid
   caseId    String
   caseRef   String
   type      String
@@ -137,7 +137,7 @@ model CaseEvent {
 
 model AuditLog {
   id        String   @id @default(uuid())
-  tenantId  String
+  tenantId  String @db.Uuid
   caseId    String?
   caseRef   String
   actorId   String?
@@ -157,7 +157,7 @@ model AuditLog {
 
 model Artifact {
   id         String   @id @default(uuid())
-  tenantId   String
+  tenantId   String @db.Uuid
   caseId     String
   caseRef    String
   objectKey  String
@@ -175,7 +175,7 @@ model Artifact {
 
 model Document {
   id        String   @id @default(uuid())
-  tenantId  String
+  tenantId  String @db.Uuid
   caseId    String
   caseRef   String
   objectKey String
@@ -205,7 +205,7 @@ enum DocumentStatus {
 
 model Consent {
   id                 String    @id @default(uuid())
-  tenantId           String
+  tenantId           String @db.Uuid
   caseId             String
   caseRef            String
   consentVersion     String
@@ -223,7 +223,7 @@ model Consent {
 
 model Communication {
   id          String                  @id @default(uuid())
-  tenantId    String
+  tenantId    String @db.Uuid
   caseId      String
   caseRef     String
   templateId  String?
@@ -248,7 +248,7 @@ model Communication {
 
 model Payout {
   id             String   @id @default(uuid())
-  tenantId       String
+  tenantId       String @db.Uuid
   caseId         String
   caseRef        String
   amountCents    Int
@@ -274,7 +274,7 @@ model Payout {
 
 model FeeAgreement {
   id             String   @id @default(uuid())
-  tenantId       String
+  tenantId       String @db.Uuid
   tierMin        TierLevel
   tierMax        TierLevel
   capAmountCents Int?
@@ -295,7 +295,7 @@ model FeeAgreement {
 
 model Invoice {
   id          String   @id @default(uuid())
-  tenantId    String
+  tenantId    String @db.Uuid
   caseId      String
   caseRef     String
   payoutId    String?
@@ -319,7 +319,7 @@ model Invoice {
 
 model Session {
   id               String   @id @default(uuid())
-  tenantId         String
+  tenantId         String @db.Uuid
   userId           String
   refreshTokenHash String
   expiresAt        DateTime
