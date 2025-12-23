@@ -6,10 +6,16 @@
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "start": "node dist/main.js",
     "build": "tsc -p tsconfig.json",
+
     "pretest": "pnpm exec prisma generate --schema ./prisma/schema.prisma",
-    "test": "pnpm exec ts-node ./test/legal-safety.test.ts && node ../../scripts/prisma-migrate-if-db.js && pnpm exec ts-node ./test/fee-calculator.test.ts && node ../../scripts/run-integration-if-db.js",
+
+    "test:unit": "pnpm exec ts-node ./test/legal-safety.test.ts && pnpm exec ts-node ./test/fee-calculator.test.ts",
+    "test:integration": "node ../../scripts/prisma-migrate-if-db.js && node ../../scripts/run-integration-if-db.js",
+    "test": "pnpm run test:unit",
+
     "lint": "eslint 'src/**/*.ts'",
     "format": "prettier --write 'src/**/*.ts'",
+
     "prisma:migrate": "pnpm exec prisma migrate dev --name init --schema ./prisma/schema.prisma",
     "prisma:generate": "pnpm exec prisma generate --schema ./prisma/schema.prisma",
     "prisma:seed": "pnpm exec prisma db seed --schema ./prisma/schema.prisma"
