@@ -1,0 +1,50 @@
+name: CI (PR)
+
+on:
+  pull_request:
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      JWT_ACCESS_SECRET: test-secret
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Prepare pnpm
+        run: corepack prepare pnpm@9.15.1 --activate
+
+      - name: Show pnpm version
+        run: pnpm -v
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Generate Prisma client
+        run: pnpm --filter @surplus/api run prisma:generate
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: |
+          pnpm exec tsc -p apps/api/tsconfig.json --noEmit
+          pnpm exec tsc -p apps/worker/tsconfig.json --noEmit
+          pnpm exec tsc -p apps/web/tsconfig.json --noEmit
+
+      - name: Unit tests (no DB)
+        run: pnpm -r -w test
+
+      - name: Build
+        run: pnpm -r --filter "./apps/**" build
