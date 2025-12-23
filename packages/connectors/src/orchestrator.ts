@@ -2,12 +2,13 @@ import { CaseIngestionService } from './ingestion';
 import { ConnectorRegistry } from './registry';
 import { ScrapydClient } from './scrapyd-client';
 import { ConnectorStateStore, defaultConnectorStateStore } from './state';
-import { ConnectorAuditEvent, ConnectorConfig } from './types';
+import { ConnectorAuditEvent, ConnectorConfig, ConnectorScrapedItem } from './types';
 
 export interface OrchestratorOptions {
   registry?: ConnectorRegistry;
   stateStore?: ConnectorStateStore;
   scrapydClient?: ScrapydClient;
+  prefetchedItems?: ConnectorScrapedItem[];
 }
 
 export class ConnectorOrchestrator {
@@ -15,6 +16,7 @@ export class ConnectorOrchestrator {
   private readonly state: ConnectorStateStore;
   private readonly scrapyd: ScrapydClient;
   private readonly ingestion: CaseIngestionService;
+  private readonly prefetchedItems?: ConnectorScrapedItem[];
 
   constructor(options?: OrchestratorOptions) {
     this.registry = options?.registry ?? new ConnectorRegistry();
@@ -22,6 +24,7 @@ export class ConnectorOrchestrator {
     this.scrapyd =
       options?.scrapydClient ?? new ScrapydClient(process.env.SCRAPYD_URL ?? 'http://localhost:6800');
     this.ingestion = new CaseIngestionService(this.state);
+    this.prefetchedItems = options?.prefetchedItems;
   }
 
   async runAllConnectors() {
@@ -44,11 +47,14 @@ export class ConnectorOrchestrator {
     this.audit(connector, 'connector_run_started', { cursor: previousCursor });
 
     try {
-      const jobId = await this.scrapyd.scheduleSpider(connector.spiderName, {
-        cursor: previousCursor ?? undefined
-      });
+      const shouldSchedule = !this.prefetchedItems;
+      const jobId = shouldSchedule
+        ? await this.scrapyd.scheduleSpider(connector.spiderName, {
+            cursor: previousCursor ?? undefined
+          })
+        : 'prefetched-items';
 
-      const items = await this.scrapyd.fetchItems(jobId);
+      const items = this.prefetchedItems ?? (await this.scrapyd.fetchItems(jobId));
       const ingestion = this.ingestion.ingestBatch(connector, items);
       const cursor = ingestion.cursor ?? previousCursor ?? null;
 

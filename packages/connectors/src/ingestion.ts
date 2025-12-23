@@ -5,6 +5,13 @@ import { NormalizedCase, NormalizedCaseSchema, generateCaseRef } from '@surplus/
 import { CaseBuilderInput, ConnectorStateStore, IngestionResult } from './state';
 import { ConnectorConfig, ConnectorScrapedItem } from './types';
 
+export class SchemaValidationError extends Error {
+  constructor(public readonly issues: unknown) {
+    super('Normalized case validation failed');
+    this.name = 'SchemaValidationError';
+  }
+}
+
 function asDateString(value?: string): string {
   if (!value) {
     const now = new Date();
@@ -38,7 +45,7 @@ export class CaseIngestionService {
 
     const filedAt = normalizedInput.filed_at ?? asDateString(item.sale_date);
 
-    const base: NormalizedCase = NormalizedCaseSchema.parse({
+    const base = {
       case_ref: caseRef,
       state: item.state,
       county_code: item.county_code,
@@ -54,9 +61,14 @@ export class CaseIngestionService {
         property_id: item.property_id
       },
       raw: item.raw
-    });
+    };
 
-    return base;
+    const validated = NormalizedCaseSchema.safeParse(base);
+    if (!validated.success) {
+      throw new SchemaValidationError(validated.error.issues);
+    }
+
+    return validated.data;
   }
 
   private buildCaseRecord(input: CaseBuilderInput) {
@@ -77,34 +89,29 @@ export class CaseIngestionService {
     const result: IngestionResult = { created: [], skipped: [], failures: [] };
 
     for (const item of items) {
-      try {
-        const rawSha = item.raw_sha256 ?? this.computeSha(item.raw);
-        const dedupeKey = this.dedupeKey(item, rawSha);
-        const existing = this.store.findCase(dedupeKey);
+      const rawSha = item.raw_sha256 ?? this.computeSha(item.raw);
+      const dedupeKey = this.dedupeKey(item, rawSha);
+      const existing = this.store.findCase(dedupeKey);
 
-        if (existing) {
-          result.skipped.push(existing);
-          result.cursor = item.cursor ?? result.cursor ?? null;
-          continue;
-        }
-
-        const normalized = this.buildNormalizedCase(connector, item);
-        const record = this.buildCaseRecord({
-          caseRef: normalized.case_ref,
-          normalized,
-          rawSha256: rawSha,
-          propertyId: item.property_id,
-          saleDate: normalized.sale_date,
-          connector: connector.key
-        });
-
-        this.store.rememberCase(record);
-        result.created.push(record);
+      if (existing) {
+        result.skipped.push(existing);
         result.cursor = item.cursor ?? result.cursor ?? null;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown ingestion failure';
-        result.failures.push({ item, error: message });
+        continue;
       }
+
+      const normalized = this.buildNormalizedCase(connector, item);
+      const record = this.buildCaseRecord({
+        caseRef: normalized.case_ref,
+        normalized,
+        rawSha256: rawSha,
+        propertyId: item.property_id,
+        saleDate: normalized.sale_date,
+        connector: connector.key
+      });
+
+      this.store.rememberCase(record);
+      result.created.push(record);
+      result.cursor = item.cursor ?? result.cursor ?? null;
     }
 
     return result;

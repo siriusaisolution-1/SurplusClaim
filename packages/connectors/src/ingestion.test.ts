@@ -1,5 +1,5 @@
 import { generateCaseRef } from '@surplus/shared';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { ConnectorOrchestrator } from './orchestrator';
 import { ConnectorRegistry } from './registry';
@@ -8,13 +8,12 @@ import { ConnectorConfig, ConnectorScrapedItem } from './types';
 
 class FakeScrapydClient {
   private jobCounter = 0;
-
-  constructor(private readonly items: ConnectorScrapedItem[]) {}
-
-  async scheduleSpider(spider: string): Promise<string> {
+  public readonly scheduleSpider = vi.fn(async (spider: string): Promise<string> => {
     this.jobCounter += 1;
     return `${spider}-job-${this.jobCounter}`;
-  }
+  });
+
+  constructor(private readonly items: ConnectorScrapedItem[]) {}
 
   async fetchItems(): Promise<ConnectorScrapedItem[]> {
     return this.items;
@@ -91,16 +90,19 @@ describe('Connector ingestion pipeline', () => {
 
     const registry = new ConnectorRegistry([connector]);
     const state = new ConnectorStateStore();
+    const scrapyd = new FakeScrapydClient(items);
     const orchestrator = new ConnectorOrchestrator({
       registry,
       stateStore: state,
-      scrapydClient: new FakeScrapydClient(items)
+      scrapydClient: scrapyd,
+      prefetchedItems: items
     });
 
-    await expect(orchestrator.runConnector(connector)).rejects.toThrow();
+    await expect(orchestrator.runConnector(connector)).rejects.toThrowError(/Normalized case validation failed/);
 
     const status = state.getStatus(connector);
     expect(status.failures).toBe(1);
     expect(state.listCases()).toHaveLength(0);
+    expect(scrapyd.scheduleSpider).not.toHaveBeenCalled();
   });
 });
