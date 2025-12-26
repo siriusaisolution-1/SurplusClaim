@@ -12,8 +12,9 @@ import { prisma } from '../src/prisma/prisma.client';
 
 const projectRoot = path.resolve(__dirname, '..');
 
-function runMigrations() {
-  execSync('pnpm exec prisma migrate deploy --schema ./prisma/schema.prisma', {
+function syncDbSchema() {
+  // migrations/ is deleted, and CI DB is ephemeral => use db push
+  execSync('pnpm exec prisma db push --schema ./prisma/schema.prisma --accept-data-loss', {
     cwd: projectRoot,
     stdio: 'inherit',
     env: {
@@ -94,7 +95,8 @@ async function seedTenants() {
 }
 
 async function main() {
-  runMigrations();
+  syncDbSchema();
+
   const app = await bootstrapApp();
   const server = app.getHttpServer();
   const seed = await seedTenants();
@@ -103,7 +105,7 @@ async function main() {
     .post('/auth/login')
     .send({ tenantId: seed.tenantA.id, email: seed.reviewerA.email, password: 'wrong' })
     .expect(401);
-  assert.ok(failedLogin.body.message.includes('Invalid'));
+  assert.ok(String(failedLogin.body.message).includes('Invalid'));
 
   const loginResponse = await request(server)
     .post('/auth/login')
