@@ -120,7 +120,6 @@ function sortKeys(value: unknown): unknown {
 }
 
 export interface CanonicalAuditEvent extends AuditEvent {
-  occurred_at: string;
   context?: Record<string, unknown>;
   payload?: Record<string, unknown>;
 }
@@ -130,7 +129,7 @@ export function canonicalizeAuditEvent(input: unknown): CanonicalAuditEvent {
 
   return {
     ...parsed,
-    occurred_at: parsed.occurred_at.toISOString(),
+    occurred_at: parsed.occurred_at,
     context: parsed.context ? (sortKeys(parsed.context) as Record<string, unknown>) : undefined,
     payload: parsed.payload ? (sortKeys(parsed.payload) as Record<string, unknown>) : undefined,
   };
