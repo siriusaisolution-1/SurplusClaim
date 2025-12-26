@@ -51,53 +51,60 @@ enum CommunicationChannel {
 }
 
 model Tenant {
-  id          String   @id @default(uuid())
-  name        String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   users           User[]
   cases           Case[]
   feeAgreements   FeeAgreement[]
   invoices        Invoice[]
   auditLogEntries AuditLog[]
+  CaseEvent       CaseEvent[]
+  Artifact        Artifact[]
+  Document        Document[]
+  Consent         Consent[]
+  Communication   Communication[]
+  Payout          Payout[]
+  Session         Session[]
 
   @@unique([name])
 }
 
 model User {
-  id        String   @id @default(uuid())
-  tenantId  String
-  email     String
-  fullName  String
+  id           String   @id @default(uuid())
+  tenantId     String   @db.Uuid
+  email        String
+  fullName     String
   passwordHash String
-  role      UserRole
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  role         UserRole
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  casesAssigned Case[] @relation("CaseReviewer")
+  tenant        Tenant     @relation(fields: [tenantId], references: [id])
+  casesAssigned Case[]     @relation("CaseReviewer")
   auditEntries  AuditLog[] @relation("AuditActor")
-  sessions Session[]
+  sessions      Session[]
 
   @@unique([tenantId, email])
   @@index([tenantId, role])
 }
 
 model Case {
-  id                 String    @id @default(uuid())
-  tenantId           String
+  id                 String     @id @default(uuid())
+  tenantId           String     @db.Uuid
   caseRef            String
   status             CaseStatus
   tierSuggested      TierLevel
   tierConfirmed      TierLevel?
   assignedReviewerId String?
   metadata           Json?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 
-  tenant           Tenant @relation(fields: [tenantId], references: [id])
-  assignedReviewer User?  @relation("CaseReviewer", fields: [assignedReviewerId], references: [id])
+  tenant           Tenant          @relation(fields: [tenantId], references: [id])
+  assignedReviewer User?           @relation("CaseReviewer", fields: [assignedReviewerId], references: [id])
   events           CaseEvent[]
   artifacts        Artifact[]
   documents        Document[]
@@ -113,13 +120,13 @@ model Case {
 }
 
 model CaseEvent {
-  id        String   @id @default(uuid())
-  tenantId  String
-  caseId    String
-  caseRef   String
-  type      String
-  payload   Json
-  createdAt DateTime @default(now())
+  id          String    @id @default(uuid())
+  tenantId    String    @db.Uuid
+  caseId      String
+  caseRef     String
+  type        String
+  payload     Json
+  createdAt   DateTime  @default(now())
   processedAt DateTime?
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
@@ -130,7 +137,7 @@ model CaseEvent {
 
 model AuditLog {
   id        String   @id @default(uuid())
-  tenantId  String
+  tenantId  String   @db.Uuid
   caseId    String?
   caseRef   String
   actorId   String?
@@ -149,45 +156,45 @@ model AuditLog {
 }
 
 model Artifact {
-  id         String   @id @default(uuid())
-  tenantId   String
-  caseId     String
-  caseRef    String
-  objectKey  String
-  sha256     String
-  source     String?
-  createdAt  DateTime @default(now())
-
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  case   Case   @relation(fields: [caseId], references: [id])
-  consent Consent?
-
-  @@index([tenantId, caseRef])
-  @@unique([tenantId, objectKey])
-}
-
-model Document {
   id        String   @id @default(uuid())
-  tenantId  String
+  tenantId  String   @db.Uuid
   caseId    String
   caseRef   String
   objectKey String
-  originalFilename String
   sha256    String
-  docType   String?
-  aiDocType String?
-  aiConfidence Float?
-  status    DocumentStatus @default(PENDING)
-  reviewerId String?
-  reviewedAt DateTime?
-  reviewNote String?
+  source    String?
   createdAt DateTime @default(now())
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  case    Case     @relation(fields: [caseId], references: [id])
+  consent Consent? @relation("ConsentArtifact")
+
+  @@unique([tenantId, objectKey])
+  @@index([tenantId, caseRef])
+}
+
+model Document {
+  id               String         @id @default(uuid())
+  tenantId         String         @db.Uuid
+  caseId           String
+  caseRef          String
+  objectKey        String
+  originalFilename String
+  sha256           String
+  docType          String?
+  aiDocType        String?
+  aiConfidence     Float?
+  status           DocumentStatus @default(PENDING)
+  reviewerId       String?
+  reviewedAt       DateTime?
+  reviewNote       String?
+  createdAt        DateTime       @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
   case   Case   @relation(fields: [caseId], references: [id])
 
-  @@index([tenantId, caseRef])
   @@unique([tenantId, objectKey])
+  @@index([tenantId, caseRef])
 }
 
 enum DocumentStatus {
@@ -197,39 +204,39 @@ enum DocumentStatus {
 }
 
 model Consent {
-  id                 String    @id @default(uuid())
-  tenantId           String
-  caseId             String
-  caseRef            String
-  consentVersion     String
-  consentArtifactId  String?
-  signedAt           DateTime
-  revokedAt          DateTime?
+  id                String    @id @default(uuid())
+  tenantId          String    @db.Uuid
+  caseId            String
+  caseRef           String
+  consentVersion    String
+  consentArtifactId String?   @unique
+  signedAt          DateTime
+  revokedAt         DateTime?
 
-  tenant   Tenant   @relation(fields: [tenantId], references: [id])
-  case     Case     @relation(fields: [caseId], references: [id])
-  artifact Artifact @relation(fields: [consentArtifactId], references: [id])
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  case     Case      @relation(fields: [caseId], references: [id])
+  artifact Artifact? @relation("ConsentArtifact", fields: [consentArtifactId], references: [id])
 
   @@index([tenantId, caseRef])
 }
 
 model Communication {
-  id          String                  @id @default(uuid())
-  tenantId    String
-  caseId      String
-  caseRef     String
-  templateId  String?
-  templateVersion String?
-  recipient   String?
-  variables   Json?
-  subject     String
-  body        String
-  direction   CommunicationDirection
-  channel     CommunicationChannel
-  status      String
-  sendAt      DateTime                @default(now())
+  id                String                 @id @default(uuid())
+  tenantId          String                 @db.Uuid
+  caseId            String
+  caseRef           String
+  templateId        String?
+  templateVersion   String?
+  recipient         String?
+  variables         Json?
+  subject           String
+  body              String
+  direction         CommunicationDirection
+  channel           CommunicationChannel
+  status            String
+  sendAt            DateTime               @default(now())
   providerMessageId String?
-  createdAt   DateTime @default(now())
+  createdAt         DateTime               @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
   case   Case   @relation(fields: [caseId], references: [id])
@@ -239,25 +246,25 @@ model Communication {
 }
 
 model Payout {
-  id             String   @id @default(uuid())
-  tenantId       String
-  caseId         String
-  caseRef        String
-  amountCents    Int
-  currency       String   @default("USD")
-  status         String
-  reference      String?
-  processedAt    DateTime?
-  confirmedAt    DateTime?
-  confirmedBy    String?
-  evidenceKey    String?
-  feeCents       Int?
-  feeRateBps     Int?
-  metadata       Json?
-  createdAt      DateTime @default(now())
+  id          String    @id @default(uuid())
+  tenantId    String    @db.Uuid
+  caseId      String
+  caseRef     String
+  amountCents Int
+  currency    String    @default("USD")
+  status      String
+  reference   String?
+  processedAt DateTime?
+  confirmedAt DateTime?
+  confirmedBy String?
+  evidenceKey String?
+  feeCents    Int?
+  feeRateBps  Int?
+  metadata    Json?
+  createdAt   DateTime  @default(now())
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  case   Case   @relation(fields: [caseId], references: [id])
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  case    Case     @relation(fields: [caseId], references: [id])
   invoice Invoice? @relation("InvoicePayout")
 
   @@index([tenantId, caseRef])
@@ -265,8 +272,8 @@ model Payout {
 }
 
 model FeeAgreement {
-  id             String   @id @default(uuid())
-  tenantId       String
+  id             String    @id @default(uuid())
+  tenantId       String    @db.Uuid
   tierMin        TierLevel
   tierMax        TierLevel
   capAmountCents Int?
@@ -275,8 +282,8 @@ model FeeAgreement {
   stateCode      String?
   contractRef    String?
   notes          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
@@ -286,22 +293,22 @@ model FeeAgreement {
 }
 
 model Invoice {
-  id          String   @id @default(uuid())
-  tenantId    String
+  id          String    @id @default(uuid())
+  tenantId    String    @db.Uuid
   caseId      String
   caseRef     String
-  payoutId    String?
+  payoutId    String?   @unique
   amountCents Int
   feeRateBps  Int?
-  currency    String   @default("USD")
-  status      String   @default("PENDING")
-  issuedAt    DateTime @default(now())
+  currency    String    @default("USD")
+  status      String    @default("PENDING")
+  issuedAt    DateTime  @default(now())
   dueAt       DateTime?
   metadata    Json?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  case   Case   @relation(fields: [caseId], references: [id])
+  tenant Tenant  @relation(fields: [tenantId], references: [id])
+  case   Case    @relation(fields: [caseId], references: [id])
   payout Payout? @relation("InvoicePayout", fields: [payoutId], references: [id])
 
   @@index([tenantId, caseRef])
@@ -309,17 +316,17 @@ model Invoice {
 }
 
 model Session {
-  id               String   @id @default(uuid())
-  tenantId         String
+  id               String    @id @default(uuid())
+  tenantId         String    @db.Uuid
   userId           String
   refreshTokenHash String
   expiresAt        DateTime
-  createdAt        DateTime @default(now())
+  createdAt        DateTime  @default(now())
   revokedAt        DateTime?
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
   user   User   @relation(fields: [userId], references: [id])
 
-  @@index([tenantId, userId])
   @@unique([refreshTokenHash])
+  @@index([tenantId, userId])
 }
