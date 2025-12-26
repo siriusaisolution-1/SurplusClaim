@@ -7,9 +7,14 @@ on:
       - master
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-verify:
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:15
@@ -20,14 +25,16 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U surplus"
+          --health-cmd "pg_isready -U surplus -d surplus"
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
+
     env:
       DATABASE_URL: postgres://surplus:surplus@localhost:5432/surplus
       JWT_ACCESS_SECRET: test-secret
       NODE_ENV: test
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,7 +48,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'pnpm'
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile=false
@@ -49,13 +56,18 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Prisma validate
+      # Prisma steps always run in CI (PR + push) because DB is ephemeral anyway
+      - name: Prisma validate (apps/api)
+        working-directory: apps/api
         run: pnpm prisma:validate
-        working-directory: apps/api
 
-      - name: Prisma generate
-        run: pnpm prisma:generate
+      - name: Prisma generate (apps/api)
         working-directory: apps/api
+        run: pnpm prisma:generate
+
+      - name: Prisma migrate deploy (apps/api)
+        working-directory: apps/api
+        run: pnpm prisma:migrate:deploy
 
       - name: Typecheck
         run: |
@@ -63,13 +75,8 @@ jobs:
           pnpm exec tsc -p apps/worker/tsconfig.json --noEmit
           pnpm exec tsc -p apps/web/tsconfig.json --noEmit
 
-      - name: Prisma migrate deploy
-        if: github.event_name == 'push'
-        run: pnpm prisma:migrate:deploy
-        working-directory: apps/api
-
       - name: Tests
         run: pnpm test
 
-      - name: Build
+      - name: Build (apps only)
         run: pnpm -r --filter "./apps/**" build
