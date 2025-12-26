@@ -1,20 +1,21 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "baseUrl": ".",
-    "rootDir": "./",
+    "baseUrl": "./src",
+    "rootDir": "./src",
+    "outDir": "./dist",
     "typeRoots": ["./types", "./node_modules/@types"],
     "paths": {
-      "@surplus/rules": ["./types/shims"],
-      "@surplus/shared": ["./types/shims"],
-      "@surplus/connectors": ["./types/shims"],
-      "@surplus/audit": ["./types/shims"],
-      "@prisma/client": ["./types/shims"]
+      "@surplus/rules": ["../types/shims"],
+      "@surplus/shared": ["../types/shims"],
+      "@surplus/connectors": ["../types/shims"],
+      "@surplus/audit": ["../types/shims"],
+      "@prisma/client": ["../types/shims"]
     },
     "strict": false,
     "noImplicitAny": false,
     "skipLibCheck": true
   },
-  "include": ["src/**/*", "types/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "prisma/**/*", "test/**/*"]
 }

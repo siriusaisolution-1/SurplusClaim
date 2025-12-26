@@ -28,6 +28,7 @@ jobs:
       DATABASE_URL: postgres://surplus:surplus@localhost:5432/surplus
       JWT_ACCESS_SECRET: test-secret
       NODE_ENV: test
+      SCHEMA_PATH: apps/api/prisma/schema.prisma
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,8 +56,38 @@ jobs:
           pnpm exec tsc -p apps/worker/tsconfig.json --noEmit
           pnpm exec tsc -p apps/web/tsconfig.json --noEmit
 
-      - name: Run migrations
-        run: pnpm --filter @surplus/api exec prisma migrate deploy --schema apps/api/prisma/schema.prisma
+      - name: Prisma (pull request)
+        if: github.event_name == 'pull_request'
+        run: |
+          SCHEMA_PATH="apps/api/prisma/schema.prisma"
+          echo "Checking Prisma schema at $(pwd)/$SCHEMA_PATH"
+          if [ -f "$SCHEMA_PATH" ]; then
+            ls -la apps/api
+            ls -la apps/api/prisma
+            echo "Schema found; running generate and validate for PR checks."
+            pnpm exec prisma generate --schema "$SCHEMA_PATH"
+            pnpm exec prisma validate --schema "$SCHEMA_PATH"
+          else
+            echo "Schema not found at $SCHEMA_PATH; directory listing:" && ls -la
+            if [ -d apps/api/prisma ]; then ls -la apps/api/prisma; fi
+            exit 1
+          fi
+
+      - name: Run migrations (main)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        run: |
+          SCHEMA_PATH="apps/api/prisma/schema.prisma"
+          echo "Checking Prisma schema at $(pwd)/$SCHEMA_PATH"
+          if [ -f "$SCHEMA_PATH" ]; then
+            ls -la apps/api
+            ls -la apps/api/prisma
+            echo "Schema found; running migrate deploy on main."
+            pnpm exec prisma migrate deploy --schema "$SCHEMA_PATH"
+          else
+            echo "Schema not found at $SCHEMA_PATH; directory listing:" && ls -la
+            if [ -d apps/api/prisma ]; then ls -la apps/api/prisma; fi
+            exit 1
+          fi
 
       - name: Tests
         run: pnpm test

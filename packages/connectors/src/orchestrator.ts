@@ -43,6 +43,8 @@ export class ConnectorOrchestrator {
 
     this.audit(connector, 'connector_run_started', { cursor: previousCursor });
 
+    let statusHandled = false;
+
     try {
       const jobId = await this.scrapyd.scheduleSpider(connector.spiderName, {
         cursor: previousCursor ?? undefined
@@ -52,23 +54,33 @@ export class ConnectorOrchestrator {
       const ingestion = this.ingestion.ingestBatch(connector, items);
       const cursor = ingestion.cursor ?? previousCursor ?? null;
 
-      this.state.setCursor(connector, cursor);
-      this.state.setStatus(connector, {
+      const status = this.state.setStatus(connector, {
         lastRun: startedAt,
         lastCursor: cursor,
         lastJobId: jobId,
         extracted: items.length,
         created: ingestion.created.length,
         failures: ingestion.failures.length,
-        lastError: ingestion.failures.length > 0 ? 'ingestion failures' : null
+        lastError: ingestion.failures.length > 0 ? ingestion.failures[0]?.error ?? 'ingestion failures' : null
       });
 
-      this.audit(connector, 'connector_run_finished', {
+      this.state.setCursor(connector, cursor);
+
+      const auditPayload = {
         jobId,
         extracted: items.length,
         created: ingestion.created.length,
         failures: ingestion.failures.length
-      });
+      } satisfies Record<string, unknown>;
+
+      if (ingestion.failures.length > 0) {
+        const message = `Connector ingestion failed: ${status.lastError ?? 'unknown failure'}`;
+        this.audit(connector, 'connector_run_finished', { ...auditPayload, error: message });
+        statusHandled = true;
+        throw new Error(message);
+      }
+
+      this.audit(connector, 'connector_run_finished', auditPayload);
 
       if (ingestion.created.length > 0) {
         this.audit(connector, 'cases_created', {
@@ -81,14 +93,16 @@ export class ConnectorOrchestrator {
       return jobId;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      this.state.setStatus(connector, {
-        lastRun: startedAt,
-        extracted: 0,
-        created: 0,
-        failures: 1,
-        lastError: message
-      });
-      this.audit(connector, 'connector_run_finished', { error: message });
+      if (!statusHandled) {
+        this.state.setStatus(connector, {
+          lastRun: startedAt,
+          extracted: 0,
+          created: 0,
+          failures: 1,
+          lastError: message
+        });
+        this.audit(connector, 'connector_run_finished', { error: message });
+      }
       throw error;
     }
   }

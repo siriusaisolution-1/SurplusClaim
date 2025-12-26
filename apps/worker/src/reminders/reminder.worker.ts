@@ -61,7 +61,7 @@ export class ReminderWorkerService implements OnModuleInit, OnModuleDestroy {
         orderBy: { createdAt: 'desc' }
       });
 
-      const hasReminderForDeadline = existing.some((item) => {
+      const hasReminderForDeadline = existing.some((item: { variables?: Record<string, unknown> | null }) => {
         const vars = (item.variables ?? {}) as Record<string, unknown>;
         return vars.deadline_name === next.name && vars.due_date === next.dueDate.toISOString();
       });

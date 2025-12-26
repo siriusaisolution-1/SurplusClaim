@@ -1310,17 +1310,24 @@ export default function CasesPage() {
                           {selectedCase.reminderHistory.length === 0 && 'No reminders logged yet.'}
                           {selectedCase.reminderHistory.length > 0 && (
                             <ul style={{ paddingLeft: '1.2rem', marginTop: '0.35rem' }}>
-                              {[...selectedCase.reminderHistory]
-                                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                                .map((event) => (
-                                  <li key={event.id}>
-                                    <span className="tag">{event.type}</span>{' '}
-                                    {event.payload?.deadlineName ?? event.payload?.deadline_name ?? 'deadline'} ·{' '}
-                                    {new Date(event.createdAt).toLocaleString()}
-                                  </li>
-                                ))}
-                            </ul>
-                          )}
+                            {[...selectedCase.reminderHistory]
+                              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                              .map((event) => (
+                                <li key={event.id}>
+                                  <span className="tag">{event.type}</span>{' '}
+                                  {
+                                    typeof event.payload?.deadlineName === 'string'
+                                      ? event.payload.deadlineName
+                                      : typeof event.payload?.deadline_name === 'string'
+                                        ? event.payload.deadline_name
+                                        : 'deadline'
+                                  }{' '}
+                                  ·{' '}
+                                  {new Date(event.createdAt).toLocaleString()}
+                                </li>
+                              ))}
+                          </ul>
+                        )}
                         </div>
                       </div>
                     </div>
