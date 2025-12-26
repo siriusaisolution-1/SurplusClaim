@@ -56,7 +56,6 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      # Prisma steps always run in CI (PR + push) because DB is ephemeral anyway
       - name: Prisma validate (apps/api)
         working-directory: apps/api
         run: pnpm prisma:validate
@@ -65,9 +64,10 @@ jobs:
         working-directory: apps/api
         run: pnpm prisma:generate
 
-      - name: Prisma migrate deploy (apps/api)
+      # Since migrations/ is deleted and CI DB is ephemeral, use db push.
+      - name: Prisma db push (apps/api)
         working-directory: apps/api
-        run: pnpm prisma:migrate:deploy
+        run: pnpm prisma:db:push
 
       - name: Typecheck
         run: |
