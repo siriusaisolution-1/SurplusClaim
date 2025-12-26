@@ -4,7 +4,8 @@
     "jsx": "preserve",
     "allowJs": true,
     "noEmit": true,
-    "rootDir": ".",
+    "rootDir": "./src",
+    "outDir": "./dist",
     "baseUrl": "./src",
     "strict": false,
     "lib": [
@@ -18,12 +19,13 @@
   },
   "include": [
     "./next-env.d.ts",
-    "./src/**/*.ts",
-    "./src/**/*.tsx"
+    "./src/**/*"
   ],
   "exclude": [
     "node_modules",
     "dist",
-    "src/pages/cases.tsx"
+    ".next",
+    "**/*.test.*",
+    "**/*.spec.*"
   ]
 }
