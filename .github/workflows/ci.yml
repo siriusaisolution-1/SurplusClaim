@@ -28,7 +28,7 @@ jobs:
       DATABASE_URL: postgres://surplus:surplus@localhost:5432/surplus
       JWT_ACCESS_SECRET: test-secret
       NODE_ENV: test
-      SCHEMA_PATH: apps/api/prisma/schema.prisma
+      SCHEMA_PATH: ./prisma/schema.prisma
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,23 +58,35 @@ jobs:
 
       - name: Prisma (pull request)
         if: github.event_name == 'pull_request'
+        working-directory: apps/api
         run: |
+          echo "Checking Prisma schema at $(pwd)/$SCHEMA_PATH"
           if [ -f "$SCHEMA_PATH" ]; then
-            echo "Schema found at $SCHEMA_PATH; running generate and validate for PR checks."
-            pnpm --filter @surplus/api exec prisma generate --schema "$SCHEMA_PATH"
-            pnpm --filter @surplus/api exec prisma validate --schema "$SCHEMA_PATH"
+            ls -la
+            ls -la prisma
+            echo "Schema found; running generate and validate for PR checks."
+            pnpm exec prisma generate --schema "$SCHEMA_PATH"
+            pnpm exec prisma validate --schema "$SCHEMA_PATH"
           else
-            echo "Schema not found at $SCHEMA_PATH; skipping Prisma checks for PR."
+            echo "Schema not found at $SCHEMA_PATH; directory listing:" && ls -la
+            if [ -d prisma ]; then ls -la prisma; fi
+            exit 1
           fi
 
       - name: Run migrations (main)
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        working-directory: apps/api
         run: |
+          echo "Checking Prisma schema at $(pwd)/$SCHEMA_PATH"
           if [ -f "$SCHEMA_PATH" ]; then
-            echo "Schema found at $SCHEMA_PATH; running migrate deploy on main."
-            pnpm --filter @surplus/api exec prisma migrate deploy --schema "$SCHEMA_PATH"
+            ls -la
+            ls -la prisma
+            echo "Schema found; running migrate deploy on main."
+            pnpm exec prisma migrate deploy --schema "$SCHEMA_PATH"
           else
-            echo "Schema not found at $SCHEMA_PATH; skipping migrate deploy."
+            echo "Schema not found at $SCHEMA_PATH; directory listing:" && ls -la
+            if [ -d prisma ]; then ls -la prisma; fi
+            exit 1
           fi
 
       - name: Tests
