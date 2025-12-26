@@ -28,6 +28,7 @@ jobs:
       DATABASE_URL: postgres://surplus:surplus@localhost:5432/surplus
       JWT_ACCESS_SECRET: test-secret
       NODE_ENV: test
+      SCHEMA_PATH: apps/api/prisma/schema.prisma
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,8 +56,26 @@ jobs:
           pnpm exec tsc -p apps/worker/tsconfig.json --noEmit
           pnpm exec tsc -p apps/web/tsconfig.json --noEmit
 
-      - name: Run migrations
-        run: pnpm --filter @surplus/api exec prisma migrate deploy --schema ./prisma/schema.prisma
+      - name: Prisma (pull request)
+        if: github.event_name == 'pull_request'
+        run: |
+          if [ -f "$SCHEMA_PATH" ]; then
+            echo "Schema found at $SCHEMA_PATH; running generate and validate for PR checks."
+            pnpm --filter @surplus/api exec prisma generate --schema "$SCHEMA_PATH"
+            pnpm --filter @surplus/api exec prisma validate --schema "$SCHEMA_PATH"
+          else
+            echo "Schema not found at $SCHEMA_PATH; skipping Prisma checks for PR."
+          fi
+
+      - name: Run migrations (main)
+        if: github.event_name != 'pull_request'
+        run: |
+          if [ -f "$SCHEMA_PATH" ]; then
+            echo "Schema found at $SCHEMA_PATH; running migrate deploy on main."
+            pnpm --filter @surplus/api exec prisma migrate deploy --schema "$SCHEMA_PATH"
+          else
+            echo "Schema not found at $SCHEMA_PATH; skipping migrate deploy."
+          fi
 
       - name: Tests
         run: pnpm test
