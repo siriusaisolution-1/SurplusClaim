@@ -6,12 +6,13 @@
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "start": "node dist/main.js",
     "build": "tsc -p tsconfig.json",
-    "test": "pnpm exec ts-node ./test/legal-safety.test.ts && pnpm exec prisma migrate deploy --schema ./prisma/schema.prisma && pnpm exec ts-node ./test/fee-calculator.test.ts && pnpm exec ts-node ./test/integration.test.ts",
+    "test": "pnpm --filter @surplus/api exec prisma generate --schema ./prisma/schema.prisma && pnpm exec ts-node ./test/legal-safety.test.ts && pnpm --filter @surplus/api exec prisma migrate deploy --schema ./prisma/schema.prisma && pnpm exec ts-node ./test/fee-calculator.test.ts && pnpm exec ts-node ./test/integration.test.ts",
+    "test:ci": "pnpm --filter @surplus/api exec prisma generate --schema ./prisma/schema.prisma && pnpm exec ts-node ./test/legal-safety.test.ts && pnpm exec ts-node ./test/fee-calculator.test.ts",
     "lint": "eslint 'src/**/*.ts'",
     "format": "prettier --write 'src/**/*.ts'",
-    "prisma:migrate": "pnpm exec prisma migrate dev --name init --schema ./prisma/schema.prisma",
-    "prisma:generate": "pnpm exec prisma generate --schema ./prisma/schema.prisma",
-    "prisma:seed": "pnpm exec prisma db seed --schema ./prisma/schema.prisma"
+    "prisma:migrate": "pnpm --filter @surplus/api exec prisma migrate dev --name init --schema ./prisma/schema.prisma",
+    "prisma:generate": "pnpm --filter @surplus/api exec prisma generate --schema ./prisma/schema.prisma",
+    "prisma:seed": "pnpm --filter @surplus/api exec prisma db seed --schema ./prisma/schema.prisma"
   },
   "dependencies": {
     "@nestjs/common": "10.3.7",

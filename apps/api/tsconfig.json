@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "baseUrl": ".",
-    "rootDir": "./",
+    "rootDir": "src",
     "typeRoots": ["./types", "./node_modules/@types"],
     "paths": {
       "@surplus/rules": ["./types/shims"],

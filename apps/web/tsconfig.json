@@ -3,8 +3,9 @@
   "compilerOptions": {
     "jsx": "preserve",
     "allowJs": true,
-    "noEmit": true
+    "noEmit": true,
+    "rootDir": "."
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+  "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules", "dist"]
 }

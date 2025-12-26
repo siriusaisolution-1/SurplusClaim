@@ -269,4 +269,4 @@ export const templateRegistry = new TemplateRegistry([
   }
 ]);
 
-export { DISCLAIMER };
+export { UPL_DISCLAIMER as DISCLAIMER };

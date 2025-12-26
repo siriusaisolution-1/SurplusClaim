@@ -44,7 +44,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile=false
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
         run: pnpm lint
@@ -55,11 +55,26 @@ jobs:
           pnpm exec tsc -p apps/worker/tsconfig.json --noEmit
           pnpm exec tsc -p apps/web/tsconfig.json --noEmit
 
-      - name: Run migrations
-        run: pnpm --filter @surplus/api exec prisma migrate deploy --schema apps/api/prisma/schema.prisma
+      - name: Prisma validate and generate (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          pnpm --filter @surplus/api exec prisma validate --schema ./prisma/schema.prisma
+          pnpm --filter @surplus/api exec prisma generate --schema ./prisma/schema.prisma
 
-      - name: Tests
+      - name: Prisma migrate deploy (main)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        run: |
+          pnpm --filter @surplus/api exec prisma migrate deploy --schema ./prisma/schema.prisma
+          pnpm --filter @surplus/api exec prisma generate --schema ./prisma/schema.prisma
+
+      - name: Tests (PR)
+        if: github.event_name == 'pull_request'
+        run: pnpm --filter @surplus/api test:ci
+
+      - name: Tests (main)
+        if: github.event_name == 'push'
         run: pnpm test
 
       - name: Build
+        if: github.event_name == 'push'
         run: pnpm -r --filter "./apps/**" build
