@@ -1,6 +1,8 @@
 import { CASE_REF_PATTERN } from '../caseRef';
 import { UPL_DISCLAIMER } from '../upl';
 
+const DISCLAIMER = UPL_DISCLAIMER;
+
 type RiskLevel = 'LOW' | 'HIGH';
 
 type VariableRule = {
