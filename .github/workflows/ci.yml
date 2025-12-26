@@ -49,14 +49,24 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Prisma validate
+        run: pnpm prisma:validate
+        working-directory: apps/api
+
+      - name: Prisma generate
+        run: pnpm prisma:generate
+        working-directory: apps/api
+
       - name: Typecheck
         run: |
           pnpm exec tsc -p apps/api/tsconfig.json --noEmit
           pnpm exec tsc -p apps/worker/tsconfig.json --noEmit
           pnpm exec tsc -p apps/web/tsconfig.json --noEmit
 
-      - name: Run migrations
-        run: pnpm --filter @surplus/api exec prisma migrate deploy --schema apps/api/prisma/schema.prisma
+      - name: Prisma migrate deploy
+        if: github.event_name == 'push'
+        run: pnpm prisma:migrate:deploy
+        working-directory: apps/api
 
       - name: Tests
         run: pnpm test

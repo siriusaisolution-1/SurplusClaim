@@ -2,7 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "baseUrl": ".",
-    "rootDir": "./",
+    "rootDir": "src",
+    "outDir": "dist",
     "typeRoots": ["./types", "./node_modules/@types"],
     "paths": {
       "@surplus/rules": ["./types/shims"],
@@ -15,6 +16,6 @@
     "noImplicitAny": false,
     "skipLibCheck": true
   },
-  "include": ["src/**/*", "types/**/*"],
-  "exclude": ["node_modules", "dist", "prisma/**/*", "test/**/*"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "prisma/**/*", "test/**/*", "types/**/*"]
 }

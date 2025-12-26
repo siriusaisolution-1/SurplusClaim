@@ -68,6 +68,13 @@ export const EmailPlanSchema = z
   })
   .strict();
 
+const occurredAtSchema = z
+  .preprocess(
+    (value) => (typeof value === 'string' || value instanceof Date ? new Date(value) : value),
+    z.date()
+  )
+  .transform((value) => value.toISOString());
+
 const ActorSchema = z
   .object({
     type: z.enum(['system', 'user', 'service']),
@@ -86,10 +93,7 @@ const TargetSchema = z
 export const AuditEventSchema = z
   .object({
     event: z.string().min(1),
-    occurred_at: z.preprocess(
-      (value) => (typeof value === 'string' || value instanceof Date ? new Date(value) : value),
-      z.date()
-    ),
+    occurred_at: occurredAtSchema,
     actor: ActorSchema,
     target: TargetSchema.optional(),
     request_id: z.string().optional(),
@@ -120,7 +124,6 @@ function sortKeys(value: unknown): unknown {
 }
 
 export interface CanonicalAuditEvent extends AuditEvent {
-  occurred_at: string;
   context?: Record<string, unknown>;
   payload?: Record<string, unknown>;
 }
@@ -130,7 +133,6 @@ export function canonicalizeAuditEvent(input: unknown): CanonicalAuditEvent {
 
   return {
     ...parsed,
-    occurred_at: parsed.occurred_at.toISOString(),
     context: parsed.context ? (sortKeys(parsed.context) as Record<string, unknown>) : undefined,
     payload: parsed.payload ? (sortKeys(parsed.payload) as Record<string, unknown>) : undefined,
   };
