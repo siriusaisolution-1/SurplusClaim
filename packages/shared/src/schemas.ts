@@ -86,10 +86,7 @@ const TargetSchema = z
 export const AuditEventSchema = z
   .object({
     event: z.string().min(1),
-    occurred_at: z.preprocess(
-      (value) => (typeof value === 'string' || value instanceof Date ? new Date(value) : value),
-      z.date()
-    ),
+    occurred_at: z.coerce.date(),
     actor: ActorSchema,
     target: TargetSchema.optional(),
     request_id: z.string().optional(),
@@ -119,10 +116,11 @@ function sortKeys(value: unknown): unknown {
   return value as Primitive | Record<string, unknown>;
 }
 
-export interface CanonicalAuditEvent extends AuditEvent {
+export type CanonicalAuditEvent = AuditEvent & {
+  occurred_at: Date;
   context?: Record<string, unknown>;
   payload?: Record<string, unknown>;
-}
+};
 
 export function canonicalizeAuditEvent(input: unknown): CanonicalAuditEvent {
   const parsed = AuditEventSchema.parse(input);
