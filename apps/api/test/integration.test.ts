@@ -13,7 +13,7 @@ import { prisma } from '../src/prisma/prisma.client';
 const projectRoot = path.resolve(__dirname, '..');
 
 function runMigrations() {
-  execSync('pnpm exec prisma migrate deploy --schema ./prisma/schema.prisma', {
+  execSync('pnpm --filter @surplus/api exec prisma migrate deploy --schema ./prisma/schema.prisma', {
     cwd: projectRoot,
     stdio: 'inherit',
     env: {
