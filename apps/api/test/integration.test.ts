@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 
@@ -12,8 +12,7 @@ import { prisma } from '../src/prisma/prisma.client';
 
 const projectRoot = path.resolve(__dirname, '..');
 
-function syncDbSchema() {
-  // migrations/ is deleted, and CI DB is ephemeral => use db push
+function runMigrations() {
   execSync('pnpm exec prisma db push --schema ./prisma/schema.prisma --accept-data-loss', {
     cwd: projectRoot,
     stdio: 'inherit',
@@ -95,7 +94,7 @@ async function seedTenants() {
 }
 
 async function main() {
-  syncDbSchema();
+  runMigrations();
 
   const app = await bootstrapApp();
   const server = app.getHttpServer();
@@ -119,14 +118,12 @@ async function main() {
     .get('/me')
     .set('Authorization', `Bearer ${accessToken}`)
     .expect(200);
-
   assert.strictEqual(meResponse.body.email, seed.reviewerA.email);
 
   const caseResponse = await request(server)
     .get('/cases/CASE-A-001')
     .set('Authorization', `Bearer ${accessToken}`)
     .expect(200);
-
   assert.strictEqual(caseResponse.body.caseRef, seed.caseA.caseRef);
 
   await request(server)
@@ -162,7 +159,6 @@ async function main() {
     .get('/audit/verify')
     .set('Authorization', `Bearer ${adminToken}`)
     .expect(200);
-
   assert.strictEqual(verifyResponse.body.isValid, true);
 
   const exportResponse = await request(server)
@@ -170,14 +166,12 @@ async function main() {
     .query({ case_ref: 'CASE-A-001' })
     .set('Authorization', `Bearer ${adminToken}`)
     .expect(200);
-
   assert.ok(exportResponse.text.includes('CASE_VIEWED'));
 
   const earliestAudit = await prisma.auditLog.findFirst({
     where: { tenantId: seed.tenantA.id },
     orderBy: { createdAt: 'asc' }
   });
-
   assert.ok(earliestAudit, 'Expected at least one audit entry to tamper with');
 
   if (earliestAudit) {
