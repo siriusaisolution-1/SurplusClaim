@@ -68,6 +68,14 @@ export const EmailPlanSchema = z
   })
   .strict();
 
+// IMPORTANT:
+// AuditEvent.occurred_at should be Date (typed), NOT string.
+// CanonicalAuditEvent will convert it to ISO string deterministically.
+const occurredAtSchema = z.preprocess(
+  (value) => (typeof value === 'string' || value instanceof Date ? new Date(value) : value),
+  z.date()
+);
+
 const ActorSchema = z
   .object({
     type: z.enum(['system', 'user', 'service']),
@@ -86,10 +94,7 @@ const TargetSchema = z
 export const AuditEventSchema = z
   .object({
     event: z.string().min(1),
-    occurred_at: z.preprocess(
-      (value) => (typeof value === 'string' || value instanceof Date ? new Date(value) : value),
-      z.date()
-    ),
+    occurred_at: occurredAtSchema, // Date
     actor: ActorSchema,
     target: TargetSchema.optional(),
     request_id: z.string().optional(),
@@ -103,9 +108,7 @@ export type EmailPlan = z.infer<typeof EmailPlanSchema>;
 export type AuditEvent = z.infer<typeof AuditEventSchema>;
 
 function sortKeys(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(sortKeys);
-  }
+  if (Array.isArray(value)) return value.map(sortKeys);
 
   if (value && typeof value === 'object') {
     return Object.keys(value as Record<string, unknown>)
@@ -119,11 +122,14 @@ function sortKeys(value: unknown): unknown {
   return value as Primitive | Record<string, unknown>;
 }
 
-export interface CanonicalAuditEvent extends AuditEvent {
-  occurred_at: string;
-  context?: Record<string, unknown>;
-  payload?: Record<string, unknown>;
-}
+// CanonicalAuditEvent is a stable, serialized representation.
+// NOTE: we DO NOT extend AuditEvent because occurred_at differs (Date vs string).
+export type CanonicalAuditEvent =
+  Omit<AuditEvent, 'occurred_at' | 'context' | 'payload'> & {
+    occurred_at: string; // ISO
+    context?: Record<string, unknown>;
+    payload?: Record<string, unknown>;
+  };
 
 export function canonicalizeAuditEvent(input: unknown): CanonicalAuditEvent {
   const parsed = AuditEventSchema.parse(input);

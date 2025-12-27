@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { CaseStatus, CommunicationChannel, CommunicationDirection } from '@prisma/client';
+import { CaseStatus, CommunicationChannel, CommunicationDirection, Prisma } from '@prisma/client';
 import { AuditEngine } from '@surplus/audit';
 import { templateRegistry } from '@surplus/shared';
 
@@ -7,6 +7,7 @@ import { prisma } from '../prisma.client';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_SCAN_INTERVAL_MS = DAY_MS;
+type CaseWithReviewer = Prisma.CaseGetPayload<{ include: { assignedReviewer: true } }>;
 
 type ProceduralDeadline = { name: string; dueDate: Date };
 
@@ -31,10 +32,10 @@ export class ReminderWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async scanAndSchedule() {
-    const cases = await prisma.case.findMany({
+    const cases: CaseWithReviewer[] = await prisma.case.findMany({
       where: {
         status: { notIn: [CaseStatus.CLOSED, CaseStatus.PAYOUT_CONFIRMED] },
-        metadata: { not: null }
+        metadata: { not: Prisma.DbNull }
       },
       include: { assignedReviewer: true }
     });

@@ -10,11 +10,20 @@ export interface OrchestratorOptions {
   scrapydClient?: ScrapydClient;
 }
 
+class IngestionFailedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'IngestionFailedError';
+  }
+}
+
 export class ConnectorOrchestrator {
   private readonly registry: ConnectorRegistry;
   private readonly state: ConnectorStateStore;
   private readonly scrapyd: ScrapydClient;
   private readonly ingestion: CaseIngestionService;
+
+  private static readonly INGESTION_ERROR = 'ingestion failures';
 
   constructor(options?: OrchestratorOptions) {
     this.registry = options?.registry ?? new ConnectorRegistry();
@@ -60,7 +69,7 @@ export class ConnectorOrchestrator {
         extracted: items.length,
         created: ingestion.created.length,
         failures: ingestion.failures.length,
-        lastError: ingestion.failures.length > 0 ? 'ingestion failures' : null
+        lastError: ingestion.failures.length > 0 ? ConnectorOrchestrator.INGESTION_ERROR : null
       });
 
       this.audit(connector, 'connector_run_finished', {
@@ -69,6 +78,10 @@ export class ConnectorOrchestrator {
         created: ingestion.created.length,
         failures: ingestion.failures.length
       });
+
+      if (ingestion.failures.length > 0) {
+        throw new IngestionFailedError(ConnectorOrchestrator.INGESTION_ERROR);
+      }
 
       if (ingestion.created.length > 0) {
         this.audit(connector, 'cases_created', {
@@ -81,14 +94,16 @@ export class ConnectorOrchestrator {
       return jobId;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      this.state.setStatus(connector, {
-        lastRun: startedAt,
-        extracted: 0,
-        created: 0,
-        failures: 1,
-        lastError: message
-      });
-      this.audit(connector, 'connector_run_finished', { error: message });
+      if (!(error instanceof IngestionFailedError)) {
+        this.state.setStatus(connector, {
+          lastRun: startedAt,
+          extracted: 0,
+          created: 0,
+          failures: 1,
+          lastError: message
+        });
+        this.audit(connector, 'connector_run_finished', { error: message });
+      }
       throw error;
     }
   }

@@ -1,11 +1,9 @@
 import { createHash } from 'node:crypto';
 
-import { AuditLog, PrismaClient } from '@prisma/client';
+import { AuditLog, Prisma, PrismaClient } from '@prisma/client';
 
-type Primitive = string | number | boolean | null;
-
-function canonicalize(value: unknown): Primitive | Primitive[] | Record<string, Primitive | Primitive[] | Record<string, unknown>> {
-  if (value === null || value === undefined) return null;
+function canonicalize(value: unknown): Prisma.InputJsonValue | Prisma.NullTypes.DbNull {
+  if (value === null || value === undefined) return Prisma.DbNull;
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return value;
   }
@@ -13,20 +11,22 @@ function canonicalize(value: unknown): Primitive | Primitive[] | Record<string, 
     return value.toISOString();
   }
   if (Array.isArray(value)) {
-    return value.map((item) => canonicalize(item)) as Primitive[];
+    return value.map((item) => canonicalize(item)) as Prisma.InputJsonValue[];
   }
   if (typeof value === 'object') {
     const sortedKeys = Object.keys(value as Record<string, unknown>).sort();
-    return sortedKeys.reduce<Record<string, unknown>>((acc, key) => {
+    const canonicalObject = sortedKeys.reduce<Record<string, Prisma.InputJsonValue | Prisma.NullTypes.DbNull>>((acc, key) => {
       acc[key] = canonicalize((value as Record<string, unknown>)[key]);
       return acc;
     }, {});
+    return canonicalObject as unknown as Prisma.InputJsonValue;
   }
-  return null;
+  return Prisma.DbNull;
 }
 
 function canonicalJson(payload: unknown): string {
-  return JSON.stringify(canonicalize(payload));
+  const normalized = canonicalize(payload);
+  return JSON.stringify(normalized === Prisma.DbNull ? null : normalized);
 }
 
 function computeHash(params: {
@@ -77,7 +77,7 @@ export class AuditEngine {
     const createdAt = new Date();
     const prevHash = prev?.hash ?? '';
     const actor = params.actor ?? '';
-    const payload = params.payload ?? {};
+    const payload = (params.payload ?? {}) as Prisma.InputJsonValue;
     const hash = computeHash({
       prevHash,
       payload,

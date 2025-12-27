@@ -1,7 +1,7 @@
 import Head from 'next/head';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
-import Link from 'next/link';
 
 import { NavBar } from '../components/NavBar';
 import { useAuth } from '../lib/auth-context';

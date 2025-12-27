@@ -51,7 +51,7 @@ enum CommunicationChannel {
 }
 
 model Tenant {
-  id          String   @id @default(uuid())
+  id          String   @id @default(uuid()) @db.Uuid
   name        String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -61,13 +61,20 @@ model Tenant {
   feeAgreements   FeeAgreement[]
   invoices        Invoice[]
   auditLogEntries AuditLog[]
+  caseEvents      CaseEvent[]
+  artifacts       Artifact[]
+  documents       Document[]
+  consents        Consent[]
+  communications  Communication[]
+  payouts         Payout[]
+  sessions        Session[]
 
   @@unique([name])
 }
 
 model User {
-  id        String   @id @default(uuid())
-  tenantId  String
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
   email     String
   fullName  String
   passwordHash String
@@ -85,13 +92,13 @@ model User {
 }
 
 model Case {
-  id                 String    @id @default(uuid())
-  tenantId           String
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @db.Uuid
   caseRef            String
   status             CaseStatus
   tierSuggested      TierLevel
   tierConfirmed      TierLevel?
-  assignedReviewerId String?
+  assignedReviewerId String?  @db.Uuid
   metadata           Json?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
@@ -113,9 +120,9 @@ model Case {
 }
 
 model CaseEvent {
-  id        String   @id @default(uuid())
-  tenantId  String
-  caseId    String
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  caseId    String   @db.Uuid
   caseRef   String
   type      String
   payload   Json
@@ -129,11 +136,11 @@ model CaseEvent {
 }
 
 model AuditLog {
-  id        String   @id @default(uuid())
-  tenantId  String
-  caseId    String?
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  caseId    String?  @db.Uuid
   caseRef   String
-  actorId   String?
+  actorId   String?  @db.Uuid
   action    String
   metadata  Json?
   hash      String
@@ -149,9 +156,9 @@ model AuditLog {
 }
 
 model Artifact {
-  id         String   @id @default(uuid())
-  tenantId   String
-  caseId     String
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @db.Uuid
+  caseId     String   @db.Uuid
   caseRef    String
   objectKey  String
   sha256     String
@@ -167,9 +174,9 @@ model Artifact {
 }
 
 model Document {
-  id        String   @id @default(uuid())
-  tenantId  String
-  caseId    String
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  caseId    String   @db.Uuid
   caseRef   String
   objectKey String
   originalFilename String
@@ -197,26 +204,27 @@ enum DocumentStatus {
 }
 
 model Consent {
-  id                 String    @id @default(uuid())
-  tenantId           String
-  caseId             String
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @db.Uuid
+  caseId             String    @db.Uuid
   caseRef            String
   consentVersion     String
-  consentArtifactId  String?
+  consentArtifactId  String?   @db.Uuid
   signedAt           DateTime
   revokedAt          DateTime?
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id])
   case     Case     @relation(fields: [caseId], references: [id])
-  artifact Artifact @relation(fields: [consentArtifactId], references: [id])
+  artifact Artifact? @relation(fields: [consentArtifactId], references: [id])
 
   @@index([tenantId, caseRef])
+  @@unique([consentArtifactId])
 }
 
 model Communication {
-  id          String                  @id @default(uuid())
-  tenantId    String
-  caseId      String
+  id          String                  @id @default(uuid()) @db.Uuid
+  tenantId    String                  @db.Uuid
+  caseId      String                  @db.Uuid
   caseRef     String
   templateId  String?
   templateVersion String?
@@ -239,9 +247,9 @@ model Communication {
 }
 
 model Payout {
-  id             String   @id @default(uuid())
-  tenantId       String
-  caseId         String
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
+  caseId         String   @db.Uuid
   caseRef        String
   amountCents    Int
   currency       String   @default("USD")
@@ -265,8 +273,8 @@ model Payout {
 }
 
 model FeeAgreement {
-  id             String   @id @default(uuid())
-  tenantId       String
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
   tierMin        TierLevel
   tierMax        TierLevel
   capAmountCents Int?
@@ -286,11 +294,11 @@ model FeeAgreement {
 }
 
 model Invoice {
-  id          String   @id @default(uuid())
-  tenantId    String
-  caseId      String
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  caseId      String   @db.Uuid
   caseRef     String
-  payoutId    String?
+  payoutId    String?  @db.Uuid
   amountCents Int
   feeRateBps  Int?
   currency    String   @default("USD")
@@ -306,12 +314,13 @@ model Invoice {
 
   @@index([tenantId, caseRef])
   @@index([tenantId, status])
+  @@unique([payoutId])
 }
 
 model Session {
-  id               String   @id @default(uuid())
-  tenantId         String
-  userId           String
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @db.Uuid
+  userId           String   @db.Uuid
   refreshTokenHash String
   expiresAt        DateTime
   createdAt        DateTime @default(now())
