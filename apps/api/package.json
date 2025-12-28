@@ -6,7 +6,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "start": "node dist/main.js",
     "build": "tsc -p tsconfig.json",
-    "test": "pnpm exec ts-node ./test/legal-safety.test.ts && pnpm exec prisma migrate deploy --schema ./prisma/schema.prisma && pnpm exec ts-node ./test/fee-calculator.test.ts && pnpm exec ts-node ./test/integration.test.ts",
+    "test": "node ./test/run-tests.js",
     "lint": "eslint 'src/**/*.ts'",
     "format": "prettier --write 'src/**/*.ts'",
     "prisma:migrate": "pnpm exec prisma migrate dev --name init --schema ./prisma/schema.prisma",
