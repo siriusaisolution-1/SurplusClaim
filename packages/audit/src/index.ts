@@ -4,7 +4,9 @@ import { AuditLog, PrismaClient } from '@prisma/client';
 
 type Primitive = string | number | boolean | null;
 
-function canonicalize(value: unknown): Primitive | Primitive[] | Record<string, Primitive | Primitive[] | Record<string, unknown>> {
+function canonicalize(
+  value: unknown
+): Primitive | Primitive[] | Record<string, Primitive | Primitive[] | Record<string, unknown>> {
   if (value === null || value === undefined) return null;
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return value;
@@ -17,8 +19,8 @@ function canonicalize(value: unknown): Primitive | Primitive[] | Record<string, 
   }
   if (typeof value === 'object') {
     const sortedKeys = Object.keys(value as Record<string, unknown>).sort();
-    return sortedKeys.reduce<Record<string, unknown>>((acc, key) => {
-      acc[key] = canonicalize((value as Record<string, unknown>)[key]);
+    return sortedKeys.reduce<Record<string, Primitive | Primitive[] | Record<string, unknown>>>((acc, key) => {
+      acc[key] = canonicalize((value as Record<string, unknown>)[key]) as Primitive | Primitive[] | Record<string, unknown>;
       return acc;
     }, {});
   }
