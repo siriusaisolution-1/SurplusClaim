@@ -10,9 +10,10 @@
     "lint": "eslint 'src/**/*.ts'",
     "format": "prettier --write 'src/**/*.ts'",
 
-    "prisma:validate": "pnpm exec prisma validate --schema ./prisma/schema.prisma",
-    "prisma:generate": "pnpm exec prisma generate --schema ./prisma/schema.prisma",
-    "prisma:db:push": "pnpm exec prisma db push --schema ./prisma/schema.prisma --accept-data-loss",
+    "prisma:validate": "prisma validate --schema ./prisma/schema.prisma",
+    "prisma:generate": "prisma generate --schema ./prisma/schema.prisma",
+    "prisma:migrate:deploy": "prisma migrate deploy --schema ./prisma/schema.prisma",
+    "prisma:db:push": "prisma db push --schema ./prisma/schema.prisma --accept-data-loss",
     "prisma:seed": "pnpm exec prisma db seed --schema ./prisma/schema.prisma",
 
     "test": "pnpm exec ts-node --project ./tsconfig.test.json ./test/legal-safety.test.ts && pnpm run prisma:generate && pnpm run prisma:db:push && pnpm exec ts-node --project ./tsconfig.test.json ./test/fee-calculator.test.ts && pnpm exec ts-node --project ./tsconfig.test.json ./test/integration.test.ts"
@@ -39,6 +40,7 @@
     "@types/jsonwebtoken": "9.0.6",
     "@types/multer": "^2.0.0",
     "@types/node": "20.14.12",
+    "@types/pdfkit": "^0.13.9",
     "@types/supertest": "2.0.16",
     "prisma": "5.21.1",
     "supertest": "6.3.4",
@@ -47,6 +49,6 @@
     "typescript": "5.4.5"
   },
   "prisma": {
-    "seed": "ts-node --project tsconfig.test.json prisma/seed.ts"
+    "seed": "ts-node --project tsconfig.json prisma/seed.ts"
   }
 }
