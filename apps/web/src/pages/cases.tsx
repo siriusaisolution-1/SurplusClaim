@@ -401,18 +401,19 @@ export default function CasesPage() {
     const jurisdiction = metadata?.jurisdiction;
 
     if (jurisdiction?.state && jurisdiction?.county_code) {
+      const { state, county_code } = jurisdiction;
       const fallbackCountyName =
         jurisdiction.county_name ||
         jurisdictions.find(
           (item) =>
-            item.state.toUpperCase() === jurisdiction.state.toUpperCase() &&
-            item.county_code.toUpperCase() === jurisdiction.county_code.toUpperCase()
+            item.state.toUpperCase() === state.toUpperCase() &&
+            item.county_code.toUpperCase() === county_code.toUpperCase()
         )?.county_name;
 
       return {
-        state: jurisdiction.state,
-        county_code: jurisdiction.county_code,
-        county_name: fallbackCountyName ?? jurisdiction.county_code,
+        state,
+        county_code,
+        county_name: fallbackCountyName ?? county_code,
         enabled: true,
         feature_flags: { enabled: true, notes: 'Derived from case metadata' }
       };
@@ -1315,7 +1316,14 @@ export default function CasesPage() {
                                 .map((event) => (
                                   <li key={event.id}>
                                     <span className="tag">{event.type}</span>{' '}
-                                    {event.payload?.deadlineName ?? event.payload?.deadline_name ?? 'deadline'} ·{' '}
+                                    {
+                                      typeof event.payload?.deadlineName === 'string'
+                                        ? event.payload?.deadlineName
+                                        : typeof event.payload?.deadline_name === 'string'
+                                          ? event.payload?.deadline_name
+                                          : 'deadline'
+                                    }{' '}
+                                    ·{' '}
                                     {new Date(event.createdAt).toLocaleString()}
                                   </li>
                                 ))}

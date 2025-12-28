@@ -2,19 +2,17 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "baseUrl": ".",
-    "rootDir": "./",
-    "typeRoots": ["./types", "./node_modules/@types"],
-    "paths": {
-      "@surplus/rules": ["./types/shims"],
-      "@surplus/shared": ["./types/shims"],
-      "@surplus/connectors": ["./types/shims"],
-      "@surplus/audit": ["./types/shims"],
-      "@prisma/client": ["./types/shims"]
-    },
-    "strict": false,
-    "noImplicitAny": false,
+    "rootDir": "src",
+    "outDir": "dist",
+
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+
+    "strict": true,
+    "noImplicitAny": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*", "types/**/*"],
-  "exclude": ["node_modules", "dist", "prisma/**/*", "test/**/*"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "test/**/*", "prisma/**/*"]
 }

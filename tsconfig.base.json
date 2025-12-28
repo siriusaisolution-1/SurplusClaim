@@ -10,7 +10,6 @@
     "emitDecoratorMetadata": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "sourceMap": true,
-    "rootDir": "src"
+    "sourceMap": true
   }
 }

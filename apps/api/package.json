@@ -6,12 +6,16 @@
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "start": "node dist/main.js",
     "build": "tsc -p tsconfig.json",
-    "test": "pnpm exec ts-node ./test/legal-safety.test.ts && pnpm exec prisma migrate deploy --schema ./prisma/schema.prisma && pnpm exec ts-node ./test/fee-calculator.test.ts && pnpm exec ts-node ./test/integration.test.ts",
+
     "lint": "eslint 'src/**/*.ts'",
     "format": "prettier --write 'src/**/*.ts'",
-    "prisma:migrate": "pnpm exec prisma migrate dev --name init --schema ./prisma/schema.prisma",
+
+    "prisma:validate": "pnpm exec prisma validate --schema ./prisma/schema.prisma",
     "prisma:generate": "pnpm exec prisma generate --schema ./prisma/schema.prisma",
-    "prisma:seed": "pnpm exec prisma db seed --schema ./prisma/schema.prisma"
+    "prisma:db:push": "pnpm exec prisma db push --schema ./prisma/schema.prisma --accept-data-loss",
+    "prisma:seed": "pnpm exec prisma db seed --schema ./prisma/schema.prisma",
+
+    "test": "pnpm exec ts-node --project ./tsconfig.test.json ./test/legal-safety.test.ts && pnpm run prisma:generate && pnpm run prisma:db:push && pnpm exec ts-node --project ./tsconfig.test.json ./test/fee-calculator.test.ts && pnpm exec ts-node --project ./tsconfig.test.json ./test/integration.test.ts"
   },
   "dependencies": {
     "@nestjs/common": "10.3.7",
@@ -43,6 +47,6 @@
     "typescript": "5.4.5"
   },
   "prisma": {
-    "seed": "ts-node --project tsconfig.json prisma/seed.ts"
+    "seed": "ts-node --project tsconfig.test.json prisma/seed.ts"
   }
 }

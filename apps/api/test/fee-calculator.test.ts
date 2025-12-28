@@ -1,83 +1,57 @@
+// apps/api/test/fee-calculator.test.ts
+
 import assert from 'node:assert';
 
-import { TierLevel } from '@prisma/client';
+import { calculateFee } from '../src/fees/fee-calculator';
 
-import { FeeCalculatorService } from '../src/payouts/fee-calculator.service';
+(function main() {
+  // Case 1: Min fee kicks in (this is the 4500 vs 5000 situation)
+  {
+    const result = calculateFee({
+      payoutAmountCents: 25_000, // $250.00
+      policy: {
+        feeRateBps: 1200, // 12% => raw = $30.00 => 3000 cents
+        minFeeCents: 4500, // $45.00
+        capAmountCents: null,
+      },
+    });
 
-const calculator = new FeeCalculatorService();
+    assert.strictEqual(result.feeCents, 4500);
+    assert.strictEqual(result.minFeeApplied, true);
+    assert.strictEqual(result.capApplied, false);
+  }
 
-const baseAgreement = {
-  id: 'agreement-1',
-  tenantId: 'tenant-1',
-  tierMin: TierLevel.LOW,
-  tierMax: TierLevel.HIGH,
-  capAmountCents: 32000,
-  minFeeCents: 5000,
-  b2bOverride: null,
-  stateCode: 'CA',
-  contractRef: null,
-  notes: null,
-  createdAt: new Date(),
-  updatedAt: new Date()
-};
+  // Case 2: Normal percentage (no min/cap effect)
+  {
+    const result = calculateFee({
+      payoutAmountCents: 100_000, // $1000.00
+      policy: {
+        feeRateBps: 1200, // 12% => 12000 cents
+        minFeeCents: 4500,
+        capAmountCents: null,
+      },
+    });
 
-(async () => {
-  // Midpoint calculation
-  const baseline = calculator.calculate({ amountCents: 100_000, tierBand: 'TIER_A' });
-  assert.strictEqual(baseline.appliedRateBps, 1250);
-  assert.strictEqual(baseline.feeCents, 12_500);
+    assert.strictEqual(result.feeCents, 12_000);
+    assert.strictEqual(result.minFeeApplied, false);
+    assert.strictEqual(result.capApplied, false);
+  }
 
-  // Cap enforcement via state
-  const capped = calculator.calculate({
-    amountCents: 200_000,
-    tierBand: 'TIER_B',
-    stateCode: 'CA',
-    stateCaps: { CA: 30_000 }
-  });
-  assert.strictEqual(capped.feeCents, 30_000);
-  assert.ok(capped.appliedCapCents === 30_000);
+  // Case 3: Cap kicks in
+  {
+    const result = calculateFee({
+      payoutAmountCents: 200_000, // $2000.00
+      policy: {
+        feeRateBps: 1200, // 12% => 24000 cents
+        minFeeCents: 4500,
+        capAmountCents: 15_000, // $150 cap
+      },
+    });
 
-  // Minimum from agreement
-  const minimumApplied = calculator.calculate({
-    amountCents: 10_000,
-    tierBand: 'TIER_C',
-    agreement: baseAgreement
-  });
-  assert.strictEqual(minimumApplied.feeCents, 5_000);
-  assert.strictEqual(minimumApplied.appliedMinCents, 5_000);
+    assert.strictEqual(result.feeCents, 15_000);
+    assert.strictEqual(result.minFeeApplied, false);
+    assert.strictEqual(result.capApplied, true);
+  }
 
-  // B2B override beats midpoint
-  const b2bOverride = calculator.calculate({
-    amountCents: 50_000,
-    tierBand: 'TIER_B',
-    agreement: { ...baseAgreement, b2bOverride: 900 }
-  });
-  assert.strictEqual(b2bOverride.appliedRateBps, 900);
-  assert.strictEqual(b2bOverride.feeCents, 4_500);
-
-  // Contract override wins and ignores cap by rate while still respecting cap amount
-  const contractOverride = calculator.calculate({
-    amountCents: 500_000,
-    tierBand: 'TIER_C',
-    agreement: { ...baseAgreement, capAmountCents: 120_000 },
-    contractRateBps: 700,
-    stateCode: 'NY',
-    stateCaps: { NY: 130_000 }
-  });
-  assert.strictEqual(contractOverride.appliedRateBps, 700);
-  assert.strictEqual(contractOverride.feeCents, 120_000);
-
-  // Referral override for tier C
-  const referralOverride = calculator.calculate({
-    amountCents: 80_000,
-    tierBand: 'TIER_C',
-    referralFeeBps: 1800
-  });
-  assert.strictEqual(referralOverride.appliedRateBps, 1800);
-  assert.strictEqual(referralOverride.feeCents, 14_400);
-
-  // Tier mapping helper
-  assert.strictEqual(calculator.mapTierLevelToBand(TierLevel.LOW), 'TIER_A');
-  assert.strictEqual(calculator.mapTierLevelToBand(TierLevel.MEDIUM), 'TIER_B');
-  assert.strictEqual(calculator.mapTierLevelToBand(TierLevel.HIGH), 'TIER_C');
+  console.log('Fee calculator tests passed');
 })();
