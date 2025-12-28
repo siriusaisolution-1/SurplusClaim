@@ -22,7 +22,11 @@ declare module '@prisma/client' {
 }
 
 declare module '@surplus/rules' {
-  export type CaseChecklistContext = any;
+  export interface CaseChecklistContext {
+    state: string;
+    county_code: string;
+    case_ref?: string;
+  }
   export class ChecklistGenerator {
     constructor(...args: any[]);
     generate(...args: any[]): any;
