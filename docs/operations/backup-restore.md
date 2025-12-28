@@ -13,7 +13,7 @@ Covers PostgreSQL (primary datastore) and uploaded documents stored on the appli
 2. Restore the database:
    - Create a new PostgreSQL instance or empty database.
    - Import the selected dump with `psql < dump.sql`.
-   - Run `pnpm --filter @surplus/api exec prisma migrate deploy --schema apps/api/prisma/schema.prisma` to re-apply migrations.
+   - Run `pnpm --filter @surplus/api exec prisma migrate deploy --schema ./prisma/schema.prisma` to re-apply migrations.
 3. Restore uploads:
    - Sync the archived `services/uploads` snapshot (or object storage prefix) back to the deployment storage location.
    - Verify checksums against the manifest to ensure file integrity.

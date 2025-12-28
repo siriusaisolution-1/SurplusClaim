@@ -56,7 +56,7 @@ jobs:
           pnpm exec tsc -p apps/web/tsconfig.json --noEmit
 
       - name: Run migrations
-        run: pnpm --filter @surplus/api exec prisma migrate deploy --schema apps/api/prisma/schema.prisma
+        run: pnpm --filter @surplus/api exec prisma migrate deploy --schema ./prisma/schema.prisma
 
       - name: Tests
         run: pnpm test
