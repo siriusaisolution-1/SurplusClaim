@@ -53,7 +53,8 @@ const baseAgreement = {
     agreement: { ...baseAgreement, b2bOverride: 900 }
   });
   assert.strictEqual(b2bOverride.appliedRateBps, 900);
-  assert.strictEqual(b2bOverride.feeCents, 4_500);
+  assert.strictEqual(b2bOverride.feeCents, 5_000);
+  assert.strictEqual(b2bOverride.appliedMinCents, 5_000);
 
   // Contract override wins and ignores cap by rate while still respecting cap amount
   const contractOverride = calculator.calculate({
@@ -65,7 +66,8 @@ const baseAgreement = {
     stateCaps: { NY: 130_000 }
   });
   assert.strictEqual(contractOverride.appliedRateBps, 700);
-  assert.strictEqual(contractOverride.feeCents, 120_000);
+  assert.strictEqual(contractOverride.feeCents, 35_000);
+  assert.strictEqual(contractOverride.appliedCapCents, 120_000);
 
   // Referral override for tier C
   const referralOverride = calculator.calculate({

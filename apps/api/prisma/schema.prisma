@@ -51,13 +51,20 @@ enum CommunicationChannel {
 }
 
 model Tenant {
-  id          String   @id @default(uuid())
+  id          String   @id @default(uuid()) @db.Uuid
   name        String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   users           User[]
   cases           Case[]
+  caseEvents      CaseEvent[]
+  artifacts       Artifact[]
+  documents       Document[]
+  consents        Consent[]
+  communications  Communication[]
+  payouts         Payout[]
+  sessions        Session[]
   feeAgreements   FeeAgreement[]
   invoices        Invoice[]
   auditLogEntries AuditLog[]
@@ -202,13 +209,13 @@ model Consent {
   caseId             String
   caseRef            String
   consentVersion     String
-  consentArtifactId  String?
+  consentArtifactId  String?  @unique
   signedAt           DateTime
   revokedAt          DateTime?
 
-  tenant   Tenant   @relation(fields: [tenantId], references: [id])
-  case     Case     @relation(fields: [caseId], references: [id])
-  artifact Artifact @relation(fields: [consentArtifactId], references: [id])
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  case     Case      @relation(fields: [caseId], references: [id])
+  artifact Artifact? @relation(fields: [consentArtifactId], references: [id])
 
   @@index([tenantId, caseRef])
 }
@@ -290,7 +297,7 @@ model Invoice {
   tenantId    String
   caseId      String
   caseRef     String
-  payoutId    String?
+  payoutId    String?  @unique
   amountCents Int
   feeRateBps  Int?
   currency    String   @default("USD")
@@ -310,7 +317,7 @@ model Invoice {
 
 model Session {
   id               String   @id @default(uuid())
-  tenantId         String
+  tenantId         String   @db.Uuid
   userId           String
   refreshTokenHash String
   expiresAt        DateTime
