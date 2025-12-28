@@ -4,6 +4,20 @@ import { ScrapydClient } from './scrapyd-client';
 import { ConnectorStateStore, defaultConnectorStateStore } from './state';
 import { ConnectorAuditEvent, ConnectorConfig } from './types';
 
+class IngestionError extends Error {
+  constructor(
+    readonly details: {
+      jobId: string;
+      cursor: string | null;
+      extracted: number;
+      created: number;
+      failures: number;
+    }
+  ) {
+    super('ingestion failures');
+  }
+}
+
 export interface OrchestratorOptions {
   registry?: ConnectorRegistry;
   stateStore?: ConnectorStateStore;
@@ -52,6 +66,24 @@ export class ConnectorOrchestrator {
       const ingestion = this.ingestion.ingestBatch(connector, items);
       const cursor = ingestion.cursor ?? previousCursor ?? null;
 
+      if (ingestion.failures.length > 0) {
+        this.audit(connector, 'connector_run_finished', {
+          jobId,
+          extracted: items.length,
+          created: ingestion.created.length,
+          failures: ingestion.failures.length,
+          error: 'ingestion failures'
+        });
+
+        throw new IngestionError({
+          jobId,
+          cursor,
+          extracted: items.length,
+          created: ingestion.created.length,
+          failures: ingestion.failures.length
+        });
+      }
+
       this.state.setCursor(connector, cursor);
       this.state.setStatus(connector, {
         lastRun: startedAt,
@@ -80,6 +112,21 @@ export class ConnectorOrchestrator {
 
       return jobId;
     } catch (error) {
+      if (error instanceof IngestionError) {
+        this.state.setCursor(connector, error.details.cursor);
+        this.state.setStatus(connector, {
+          lastRun: startedAt,
+          lastCursor: error.details.cursor,
+          lastJobId: error.details.jobId,
+          extracted: error.details.extracted,
+          created: error.details.created,
+          failures: error.details.failures,
+          lastError: error.message
+        });
+
+        throw error;
+      }
+
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.state.setStatus(connector, {
         lastRun: startedAt,
