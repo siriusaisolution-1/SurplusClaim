@@ -400,25 +400,27 @@ export default function CasesPage() {
       | undefined;
     const jurisdiction = metadata?.jurisdiction;
 
-    if (jurisdiction?.state && jurisdiction?.county_code) {
-      const fallbackCountyName =
-        jurisdiction.county_name ||
-        jurisdictions.find(
-          (item) =>
-            item.state.toUpperCase() === jurisdiction.state.toUpperCase() &&
-            item.county_code.toUpperCase() === jurisdiction.county_code.toUpperCase()
-        )?.county_name;
-
-      return {
-        state: jurisdiction.state,
-        county_code: jurisdiction.county_code,
-        county_name: fallbackCountyName ?? jurisdiction.county_code,
-        enabled: true,
-        feature_flags: { enabled: true, notes: 'Derived from case metadata' }
-      };
+    if (!jurisdiction?.state || !jurisdiction?.county_code) {
+      return null;
     }
 
-    return null;
+    const jurisdictionState = jurisdiction.state.toUpperCase();
+    const jurisdictionCountyCode = jurisdiction.county_code.toUpperCase();
+    const fallbackCountyName =
+      jurisdiction.county_name ||
+      jurisdictions.find(
+        (item) =>
+          item.state.toUpperCase() === jurisdictionState &&
+          item.county_code.toUpperCase() === jurisdictionCountyCode
+      )?.county_name;
+
+    return {
+      state: jurisdiction.state,
+      county_code: jurisdiction.county_code,
+      county_name: fallbackCountyName ?? jurisdiction.county_code,
+      enabled: true,
+      feature_flags: { enabled: true, notes: 'Derived from case metadata' }
+    };
   };
 
   const loadRulesForCase = async (jurisdiction: JurisdictionSummary, caseRef: string) => {
@@ -1315,7 +1317,20 @@ export default function CasesPage() {
                                 .map((event) => (
                                   <li key={event.id}>
                                     <span className="tag">{event.type}</span>{' '}
-                                    {event.payload?.deadlineName ?? event.payload?.deadline_name ?? 'deadline'} ·{' '}
+                                    {(() => {
+                                      const deadlineName = event.payload?.deadlineName;
+                                      if (typeof deadlineName === 'string' && deadlineName.length > 0) {
+                                        return deadlineName;
+                                      }
+
+                                      const legacyDeadlineName = event.payload?.deadline_name;
+                                      if (typeof legacyDeadlineName === 'string' && legacyDeadlineName.length > 0) {
+                                        return legacyDeadlineName;
+                                      }
+
+                                      return 'deadline';
+                                    })()}{' '}
+                                    ·{' '}
                                     {new Date(event.createdAt).toLocaleString()}
                                   </li>
                                 ))}
