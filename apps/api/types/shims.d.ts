@@ -43,9 +43,9 @@ declare module '@surplus/rules' {
 }
 
 declare module '@surplus/shared' {
-  export const UPL_DISCLAIMER: any;
-  export const UPL_UI_NOTICE: any;
-  export const AI_OUTPUT_RULES: any;
+  export const UPL_DISCLAIMER: string;
+  export const UPL_UI_NOTICE: string;
+  export const AI_OUTPUT_RULES: { rationaleMessages: Set<string> };
   export const templateRegistry: any;
   export const NormalizedCaseSchema: any;
   export type NormalizedCase = any;
