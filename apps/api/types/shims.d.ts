@@ -1,9 +1,9 @@
 // apps/api/types/shims.d.ts
-// Minimal shims for workspace packages ONLY.
-// DO NOT declare @nestjs/* or @prisma/client here.
-// DO NOT use `declare module '*';`
+// Minimal shims ONLY for libraries that don't ship TS types.
+// DO NOT shim @nestjs/*, @prisma/client, or workspace packages (@surplus/*)
+// because that overrides real type definitions and breaks CI.
 
-declare module '@surplus/rules';
-declare module '@surplus/shared';
-declare module '@surplus/connectors';
-declare module '@surplus/audit';
+declare module 'pdfkit' {
+  const PDFDocument: any;
+  export = PDFDocument;
+}
