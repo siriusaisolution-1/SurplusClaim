@@ -11,7 +11,8 @@
     "build:web": "pnpm --filter @surplus/web build",
     "dev:web": "pnpm --filter @surplus/web dev",
     "lint:web": "pnpm --filter @surplus/web lint",
-    "test:web": "pnpm --filter @surplus/web test"
+    "test:web": "pnpm --filter @surplus/web test",
+    "check:ci": "pnpm lint && pnpm exec tsc -p apps/api/tsconfig.json --noEmit && pnpm exec tsc -p apps/worker/tsconfig.json --noEmit && pnpm exec tsc -p apps/web/tsconfig.json --noEmit && pnpm --dir apps/api exec prisma migrate deploy --schema ./prisma/schema.prisma && pnpm test && pnpm -r --filter './apps/**' build"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "6.21.0",

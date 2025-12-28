@@ -100,7 +100,8 @@ describe('shared schemas', () => {
       payload: { b: 2, a: 1 },
     });
 
-    expect(canonical.occurred_at).toBe('2026-04-01T10:00:00.000Z');
+    expect(canonical.occurred_at).toBeInstanceOf(Date);
+    expect((canonical.occurred_at as Date).toISOString()).toBe('2026-04-01T10:00:00.000Z');
     expect(Object.keys(canonical.payload ?? {})).toEqual(['a', 'b']);
     expect(AuditEventSchema.parse(canonical)).toBeTruthy();
   });
