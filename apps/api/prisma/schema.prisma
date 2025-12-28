@@ -51,7 +51,7 @@ enum CommunicationChannel {
 }
 
 model Tenant {
-  id          String   @id @default(uuid())
+  id          String   @id @default(uuid()) @db.Uuid
   name        String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -73,8 +73,8 @@ model Tenant {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  tenantId  String
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
   email     String
   fullName  String
   passwordHash String
@@ -92,13 +92,13 @@ model User {
 }
 
 model Case {
-  id                 String    @id @default(uuid())
-  tenantId           String
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @db.Uuid
   caseRef            String
   status             CaseStatus
   tierSuggested      TierLevel
   tierConfirmed      TierLevel?
-  assignedReviewerId String?
+  assignedReviewerId String?   @db.Uuid
   metadata           Json?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
@@ -120,9 +120,9 @@ model Case {
 }
 
 model CaseEvent {
-  id        String   @id @default(uuid())
-  tenantId  String
-  caseId    String
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  caseId    String   @db.Uuid
   caseRef   String
   type      String
   payload   Json
@@ -136,11 +136,11 @@ model CaseEvent {
 }
 
 model AuditLog {
-  id        String   @id @default(uuid())
-  tenantId  String
-  caseId    String?
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  caseId    String?  @db.Uuid
   caseRef   String
-  actorId   String?
+  actorId   String?  @db.Uuid
   action    String
   metadata  Json?
   hash      String
@@ -156,9 +156,9 @@ model AuditLog {
 }
 
 model Artifact {
-  id         String   @id @default(uuid())
-  tenantId   String
-  caseId     String
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @db.Uuid
+  caseId     String   @db.Uuid
   caseRef    String
   objectKey  String
   sha256     String
@@ -174,9 +174,9 @@ model Artifact {
 }
 
 model Document {
-  id        String   @id @default(uuid())
-  tenantId  String
-  caseId    String
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  caseId    String   @db.Uuid
   caseRef   String
   objectKey String
   originalFilename String
@@ -185,7 +185,7 @@ model Document {
   aiDocType String?
   aiConfidence Float?
   status    DocumentStatus @default(PENDING)
-  reviewerId String?
+  reviewerId String?  @db.Uuid
   reviewedAt DateTime?
   reviewNote String?
   createdAt DateTime @default(now())
@@ -204,12 +204,12 @@ enum DocumentStatus {
 }
 
 model Consent {
-  id                 String    @id @default(uuid())
-  tenantId           String
-  caseId             String
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @db.Uuid
+  caseId             String    @db.Uuid
   caseRef            String
   consentVersion     String
-  consentArtifactId  String?   @unique
+  consentArtifactId  String?   @unique @db.Uuid
   signedAt           DateTime
   revokedAt          DateTime?
 
@@ -221,9 +221,9 @@ model Consent {
 }
 
 model Communication {
-  id          String                  @id @default(uuid())
-  tenantId    String
-  caseId      String
+  id          String                  @id @default(uuid()) @db.Uuid
+  tenantId    String                  @db.Uuid
+  caseId      String                  @db.Uuid
   caseRef     String
   templateId  String?
   templateVersion String?
@@ -246,9 +246,9 @@ model Communication {
 }
 
 model Payout {
-  id             String   @id @default(uuid())
-  tenantId       String
-  caseId         String
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
+  caseId         String   @db.Uuid
   caseRef        String
   amountCents    Int
   currency       String   @default("USD")
@@ -256,7 +256,7 @@ model Payout {
   reference      String?
   processedAt    DateTime?
   confirmedAt    DateTime?
-  confirmedBy    String?
+  confirmedBy    String?  @db.Uuid
   evidenceKey    String?
   feeCents       Int?
   feeRateBps     Int?
@@ -272,8 +272,8 @@ model Payout {
 }
 
 model FeeAgreement {
-  id             String   @id @default(uuid())
-  tenantId       String
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
   tierMin        TierLevel
   tierMax        TierLevel
   capAmountCents Int?
@@ -293,11 +293,11 @@ model FeeAgreement {
 }
 
 model Invoice {
-  id          String   @id @default(uuid())
-  tenantId    String
-  caseId      String
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  caseId      String   @db.Uuid
   caseRef     String
-  payoutId    String?  @unique
+  payoutId    String?  @unique @db.Uuid
   amountCents Int
   feeRateBps  Int?
   currency    String   @default("USD")
@@ -316,9 +316,9 @@ model Invoice {
 }
 
 model Session {
-  id               String   @id @default(uuid())
-  tenantId         String
-  userId           String
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @db.Uuid
+  userId           String   @db.Uuid
   refreshTokenHash String
   expiresAt        DateTime
   createdAt        DateTime @default(now())

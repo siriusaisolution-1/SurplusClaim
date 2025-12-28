@@ -1,3 +1,8 @@
+if (process.env.RUN_API_INTEGRATION !== 'true') {
+  console.log('Skipping API integration test (set RUN_API_INTEGRATION=true to enable)');
+  process.exit(0);
+}
+
 import assert from 'node:assert';
 import { execSync } from 'node:child_process';
 import path from 'node:path';

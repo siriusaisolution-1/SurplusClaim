@@ -113,6 +113,9 @@ declare module '@nestjs/common' {
   export type CallHandler = any;
   export type NestInterceptor = any;
   export type LoggerService = any;
+  export interface INestApplication {
+    [key: string]: any;
+  }
 }
 
 declare module '@nestjs/testing' {

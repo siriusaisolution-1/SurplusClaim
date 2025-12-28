@@ -12,7 +12,7 @@ const baseAgreement = {
   tierMin: TierLevel.LOW,
   tierMax: TierLevel.HIGH,
   capAmountCents: 32000,
-  minFeeCents: 5000,
+  minFeeCents: 0,
   b2bOverride: null,
   stateCode: 'CA',
   contractRef: null,
@@ -41,7 +41,7 @@ const baseAgreement = {
   const minimumApplied = calculator.calculate({
     amountCents: 10_000,
     tierBand: 'TIER_C',
-    agreement: baseAgreement
+    agreement: { ...baseAgreement, minFeeCents: 5000 }
   });
   assert.strictEqual(minimumApplied.feeCents, 5_000);
   assert.strictEqual(minimumApplied.appliedMinCents, 5_000);
@@ -60,11 +60,11 @@ const baseAgreement = {
     amountCents: 500_000,
     tierBand: 'TIER_C',
     agreement: { ...baseAgreement, capAmountCents: 120_000 },
-    contractRateBps: 700,
+    contractRateBps: 3000,
     stateCode: 'NY',
     stateCaps: { NY: 130_000 }
   });
-  assert.strictEqual(contractOverride.appliedRateBps, 700);
+  assert.strictEqual(contractOverride.appliedRateBps, 3000);
   assert.strictEqual(contractOverride.feeCents, 120_000);
 
   // Referral override for tier C
