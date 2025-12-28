@@ -3,9 +3,9 @@ ALTER TABLE "User" ADD COLUMN "passwordHash" TEXT NOT NULL DEFAULT '';
 
 -- Session table to store refresh tokens with tenant scoping
 CREATE TABLE "Session" (
-    "id" TEXT NOT NULL,
-    "tenantId" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "tenantId" UUID NOT NULL,
+    "userId" UUID NOT NULL,
     "refreshTokenHash" TEXT NOT NULL,
     "expiresAt" TIMESTAMP(3) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
