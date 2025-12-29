@@ -12,7 +12,8 @@
     "prisma:migrate": "pnpm exec prisma migrate deploy --schema ./prisma/schema.prisma",
     "prisma:migrate:dev": "pnpm exec prisma migrate dev --schema ./prisma/schema.prisma",
     "prisma:generate": "pnpm exec prisma generate --schema ./prisma/schema.prisma",
-    "prisma:seed": "pnpm exec prisma db seed --schema ./prisma/schema.prisma"
+    "prisma:seed": "pnpm exec prisma db seed --schema ./prisma/schema.prisma",
+    "postinstall": "pnpm exec prisma generate --schema ./prisma/schema.prisma"
   },
   "dependencies": {
     "@nestjs/common": "10.3.7",
@@ -46,6 +47,7 @@
     "typescript": "5.4.5"
   },
   "prisma": {
+    "schema": "./prisma/schema.prisma",
     "seed": "ts-node --project tsconfig.json prisma/seed.ts"
   }
 }
