@@ -66,6 +66,8 @@ jobs:
           pnpm exec tsc -p apps/web/tsconfig.json --noEmit
 
       - name: Tests
+        env:
+          SKIP_PRISMA_DB_SETUP: "true"
         run: pnpm test
 
       - name: Build
