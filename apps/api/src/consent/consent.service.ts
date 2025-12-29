@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { CaseStatus } from '@prisma/client';
+import { Artifact, Case, CaseStatus, Consent } from '@prisma/client';
 import PDFDocument from 'pdfkit';
 import { createHash, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
@@ -110,13 +110,12 @@ export class ConsentService {
         }
       });
 
-      const consentEligibleStatuses: CaseStatus[] = [
-        CaseStatus.DISCOVERED,
-        CaseStatus.TRIAGED,
-        CaseStatus.CLIENT_CONTACTED
-      ];
+      const consentEligibleStatuses = new Set<CaseStatus>([
+        CaseStatus.CLIENT_CONTACTED,
+        CaseStatus.ON_HOLD
+      ]);
 
-      const shouldAdvanceToConsent = consentEligibleStatuses.includes(caseRecord.status);
+      const shouldAdvanceToConsent = consentEligibleStatuses.has(caseRecord.status);
 
       const updated = shouldAdvanceToConsent
         ? await tx.case.update({ where: { id: caseRecord.id }, data: { status: CaseStatus.CONSENT_SIGNED } })
@@ -153,7 +152,11 @@ export class ConsentService {
         });
       }
 
-      return { artifact: artifactRecord, consent: consentRecord, updatedCase: updated };
+      return {
+        artifact: artifactRecord,
+        consent: consentRecord,
+        updatedCase: updated
+      } satisfies { artifact: Artifact; consent: Consent; updatedCase: Case };
     });
 
     await this.storeArtifactFile(payload.caseRef, payload.version, pdfBuffer);
@@ -226,9 +229,11 @@ export class ConsentService {
       const doc = new PDFDocument({ margin: 50 });
       const chunks: Buffer[] = [];
 
-      doc.on('data', (chunk) => chunks.push(chunk as Buffer));
+      doc.on('data', (chunk: string | Buffer) =>
+        chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk)
+      );
       doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', (err) => reject(err));
+      doc.on('error', (err: Error) => reject(err));
 
       doc.fontSize(18).text('Client Consent & Engagement Summary', { align: 'center' });
       doc.moveDown();
