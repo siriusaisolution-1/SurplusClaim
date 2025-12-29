@@ -24,20 +24,77 @@ declare module '@prisma/client' {
 }
 
 declare module '@surplus/rules' {
-  export type CaseChecklistContext = import('../../packages/rules/src/checklist').CaseChecklistContext;
-  export class ChecklistGenerator {
-    constructor(registry: import('../../packages/rules/src/loader').RulesRegistry);
-    generate(context: CaseChecklistContext): import('../../packages/rules/src/schemas').ChecklistItem[];
+  export interface CaseChecklistContext {
+    case_ref: string;
+    state: string;
+    county_code: string;
   }
+
+  export interface RequiredDocument {
+    id: string;
+    title: string;
+    description?: string;
+    required: boolean;
+    conditions?: string;
+  }
+
+  export interface ChecklistJurisdiction {
+    state: string;
+    county_code: string;
+    county_name: string;
+  }
+
+  export type ChecklistItem = RequiredDocument & {
+    jurisdiction: ChecklistJurisdiction;
+    type: 'document' | 'form';
+  };
+
+  export interface JurisdictionRule {
+    state: string;
+    county_code: string;
+    county_name: string;
+    feature_flags: { enabled: boolean; notes?: string };
+    required_documents: RequiredDocument[];
+    forms: { id: string; name: string; url: string; description?: string }[];
+    procedural: {
+      submission_channels: string[];
+      deadlines: { name: string; timeline: string; notes?: string }[];
+      addresses: {
+        name: string;
+        attention?: string;
+        line1: string;
+        line2?: string;
+        city: string;
+        state: string;
+        postal_code: string;
+      }[];
+    };
+    allowed_email_templates: { id: string; name: string; description?: string }[];
+    fee_schedule: {
+      min_fee_cents?: number;
+      max_fee_cents?: number;
+    };
+  }
+
+  export const CaseChecklistContextSchema: import('zod').ZodType<CaseChecklistContext>;
+
   export class RulesRegistry {
-    constructor(...args: any[]);
-    listJurisdictions(): any;
-    getRule(...args: any[]): any;
+    constructor(options?: { basePath?: string; disabledJurisdictions?: string[] });
+    listJurisdictions(): Array<{
+      state: string;
+      county_code: string;
+      county_name: string;
+      enabled: boolean;
+      feature_flags: JurisdictionRule['feature_flags'];
+    }>;
+    getRule(state: string, countyCode: string): JurisdictionRule | undefined;
+    getChecklistItems(state: string, countyCode: string): ChecklistItem[];
   }
-  export class ConnectorRegistry {
-    constructor(...args: any[]);
+
+  export class ChecklistGenerator {
+    constructor(registry: RulesRegistry);
+    generate(context: CaseChecklistContext): ChecklistItem[];
   }
-  export const defaultConnectorStateStore: any;
 }
 
 declare module '@surplus/shared' {
