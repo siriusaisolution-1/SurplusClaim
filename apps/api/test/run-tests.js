@@ -3,6 +3,7 @@ const net = require('net');
 
 const dbUrl = process.env.DATABASE_URL ?? 'postgresql://surplus:surplus@localhost:5432/surplus';
 process.env.DATABASE_URL = dbUrl;
+const skipPrismaSetup = process.env.SKIP_PRISMA_DB_SETUP === 'true';
 
 function run(cmd) {
   execSync(cmd, { stdio: 'inherit' });
@@ -29,7 +30,11 @@ function canReach(host, port) {
 
 (async () => {
   try {
-    run('pnpm exec prisma generate --schema ./prisma/schema.prisma');
+    if (!skipPrismaSetup) {
+      run('pnpm exec prisma generate --schema ./prisma/schema.prisma');
+    } else {
+      console.log('Skipping Prisma client generation (SKIP_PRISMA_DB_SETUP=true)');
+    }
     run('pnpm exec ts-node ./test/legal-safety.test.ts');
 
     const url = new URL(dbUrl.replace(/^postgresql/, 'postgres'));
@@ -41,7 +46,11 @@ function canReach(host, port) {
       return;
     }
 
-    run('pnpm exec prisma migrate deploy --schema ./prisma/schema.prisma');
+    if (!skipPrismaSetup) {
+      run('pnpm exec prisma migrate deploy --schema ./prisma/schema.prisma');
+    } else {
+      console.log('Skipping Prisma migrate deploy (SKIP_PRISMA_DB_SETUP=true)');
+    }
     run('pnpm exec ts-node ./test/fee-calculator.test.ts');
     run('pnpm exec ts-node ./test/integration.test.ts');
   } catch (error) {

@@ -9,7 +9,8 @@
     "test": "node ./test/run-tests.js",
     "lint": "eslint 'src/**/*.ts'",
     "format": "prettier --write 'src/**/*.ts'",
-    "prisma:migrate": "pnpm exec prisma migrate dev --name init --schema ./prisma/schema.prisma",
+    "prisma:migrate": "pnpm exec prisma migrate deploy --schema ./prisma/schema.prisma",
+    "prisma:migrate:dev": "pnpm exec prisma migrate dev --schema ./prisma/schema.prisma",
     "prisma:generate": "pnpm exec prisma generate --schema ./prisma/schema.prisma",
     "prisma:seed": "pnpm exec prisma db seed --schema ./prisma/schema.prisma"
   },

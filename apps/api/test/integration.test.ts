@@ -4,8 +4,6 @@ if (process.env.RUN_API_INTEGRATION !== 'true') {
 }
 
 import assert from 'node:assert';
-import { execSync } from 'node:child_process';
-import path from 'node:path';
 
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -14,19 +12,6 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { hashPasswordForStorage } from '../src/auth/password.util';
 import { prisma } from '../src/prisma/prisma.client';
-
-const projectRoot = path.resolve(__dirname, '..');
-
-function runMigrations() {
-  execSync('pnpm exec prisma migrate deploy --schema ./prisma/schema.prisma', {
-    cwd: projectRoot,
-    stdio: 'inherit',
-    env: {
-      ...process.env,
-      DATABASE_URL: process.env.DATABASE_URL ?? 'postgresql://surplus:surplus@localhost:5432/surplus'
-    }
-  });
-}
 
 async function bootstrapApp(): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -99,7 +84,6 @@ async function seedTenants() {
 }
 
 async function main() {
-  runMigrations();
   const app = await bootstrapApp();
   const server = app.getHttpServer();
   const seed = await seedTenants();
