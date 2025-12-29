@@ -1,7 +1,8 @@
 import path from 'node:path';
 
 import { BadRequestException } from '@nestjs/common';
-import { FileFilterCallback } from 'multer';
+import type { Request } from 'express';
+import type { Options as MulterOptions } from 'multer';
 
 export const MAX_UPLOAD_BYTES = parseInt(process.env.MAX_UPLOAD_BYTES ?? '5242880', 10); // 5 MiB default
 export const ALLOWED_MIME_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
@@ -24,11 +25,13 @@ export function validateFileInput(file: Express.Multer.File | undefined) {
   }
 }
 
-export function uploadFileFilter(_req: any, file: Express.Multer.File, cb: FileFilterCallback) {
+export type MulterFileFilter = NonNullable<MulterOptions['fileFilter']>;
+
+export const uploadFileFilter: MulterFileFilter = (_req: Request, file, cb) => {
   try {
     validateFileInput(file);
     cb(null, true);
   } catch (error) {
     cb(error as Error);
   }
-}
+};

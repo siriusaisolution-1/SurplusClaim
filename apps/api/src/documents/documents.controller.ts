@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post, UploadedFile, UseInterceptors, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import multer from 'multer';
+import multer, { type Options as MulterOptions } from 'multer';
 
 import { CurrentUser, Roles } from '../auth/auth.decorators';
 import { DocumentStatus, DocumentsService } from './documents.service';
@@ -23,7 +23,7 @@ export class DocumentsController {
       storage: multer.memoryStorage(),
       limits: { fileSize: MAX_UPLOAD_BYTES },
       fileFilter: uploadFileFilter
-    })
+    } satisfies MulterOptions)
   )
   async upload(
     @Param('caseRef') caseRef: string,
