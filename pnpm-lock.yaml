@@ -96,6 +96,9 @@ importers:
       '@types/node':
         specifier: 20.14.12
         version: 20.14.12
+      '@types/pdfkit':
+        specifier: ^0.17.4
+        version: 0.17.4
       '@types/supertest':
         specifier: 2.0.16
         version: 2.0.16
@@ -1151,6 +1154,12 @@ packages:
     resolution: {integrity: sha512-r7wNXakLeSsGT0H1AU863vS2wa5wBOK4bWMjZz2wj+8nBx+m5PeIn0k8AloSLpRuiwdRQZwarZqHE4FNArPuJQ==}
     dependencies:
       undici-types: 5.26.5
+    dev: true
+
+  /@types/pdfkit@0.17.4:
+    resolution: {integrity: sha512-odAmVuuguRxKh1X4pbMrJMp8ecwNqHRw6lweupvzK+wuyNmi6wzlUlGVZ9EqMvp3Bs2+L9Ty0sRlrvKL+gsQZg==}
+    dependencies:
+      '@types/node': 20.14.12
     dev: true
 
   /@types/prop-types@15.7.15:
