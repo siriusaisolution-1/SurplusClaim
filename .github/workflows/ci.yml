@@ -25,38 +25,45 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgres://surplus:surplus@localhost:5432/surplus
+      DATABASE_URL: postgresql://surplus:surplus@localhost:5432/surplus
       JWT_ACCESS_SECRET: test-secret
       NODE_ENV: test
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 8.15.4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'pnpm'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Enable corepack and pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@8.15.4 --activate
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile=false
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
         run: pnpm lint
+
+      - name: Prisma generate
+        working-directory: apps/api
+        run: pnpm exec prisma generate --schema prisma/schema.prisma
+
+      - name: Prisma migrate deploy
+        working-directory: apps/api
+        run: pnpm exec prisma migrate deploy --schema prisma/schema.prisma
 
       - name: Typecheck
         run: |
           pnpm exec tsc -p apps/api/tsconfig.json --noEmit
           pnpm exec tsc -p apps/worker/tsconfig.json --noEmit
           pnpm exec tsc -p apps/web/tsconfig.json --noEmit
-
-      - name: Run migrations
-        run: pnpm --filter @surplus/api exec prisma migrate deploy --schema ./prisma/schema.prisma
 
       - name: Tests
         run: pnpm test
