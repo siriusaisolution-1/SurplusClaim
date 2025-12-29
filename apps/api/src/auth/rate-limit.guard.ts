@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
-import { ThrottlerException } from '@nestjs/throttler';
+import {
+  CanActivate,
+  ExecutionContext,
+  HttpException,
+  HttpStatus,
+  Injectable
+} from '@nestjs/common';
 
 import { StructuredLoggerService } from '../observability/structured-logger.service';
 
@@ -44,7 +49,14 @@ export class RateLimitGuard implements CanActivate {
         requestId,
         retryAfterSeconds
       });
-      throw new ThrottlerException('Rate limit exceeded for tenant');
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.TOO_MANY_REQUESTS,
+          message: 'Rate limit exceeded for tenant',
+          retryAfterSeconds
+        },
+        HttpStatus.TOO_MANY_REQUESTS
+      );
     }
 
     return true;
