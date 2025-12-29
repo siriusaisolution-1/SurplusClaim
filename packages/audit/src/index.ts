@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { AuditLog, PrismaClient } from '@prisma/client';
+import { AuditLog, Prisma, PrismaClient } from '@prisma/client';
 
 type Primitive = string | number | boolean | null;
 
@@ -67,7 +67,7 @@ export class AuditEngine {
     tenantId: string;
     eventType: string;
     actor?: string | null;
-    payload?: Record<string, unknown>;
+    payload?: Prisma.InputJsonValue;
     caseRef?: string;
     caseId?: string | null;
   }): Promise<AuditLog> {

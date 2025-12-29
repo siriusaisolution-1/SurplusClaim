@@ -230,7 +230,7 @@ export class PayoutsService {
         toState: CaseStatus.PAYOUT_CONFIRMED,
         reason: 'Payout confirmed with invoice generated'
       });
-      updatedStatus = transition.status ?? transition.case?.status ?? CaseStatus.PAYOUT_CONFIRMED;
+      updatedStatus = transition.status ?? CaseStatus.PAYOUT_CONFIRMED;
     }
 
     if (params.closeCase && updatedStatus !== CaseStatus.CLOSED) {

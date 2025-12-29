@@ -1,140 +1,30 @@
-declare module '@prisma/client' {
-  export const CaseStatus: any;
-  export const TierLevel: any;
-  export const FeeAgreement: any;
-  export const CommunicationChannel: any;
-  export const CommunicationDirection: any;
-  export type CaseStatus = any;
-  export type TierLevel = any;
-  export type FeeAgreement = any;
-  export type CommunicationChannel = any;
-  export type CommunicationDirection = any;
-  export type AuditLog = any;
-  export namespace Prisma {
-    export type TransactionClient = any;
-  }
-  export class PrismaClient {
-    constructor(...args: any[]);
-    [key: string]: any;
-  }
-  const prisma: any;
-  export default prisma;
-}
+// Ambient module declarations for internal workspace packages referenced by the API.
+// These mirror the actual package exports to preserve type safety without overriding
+// external dependencies.
 
 declare module '@surplus/rules' {
-  export interface CaseChecklistContext {
-    state: string;
-    county_code: string;
-    case_ref?: string;
-  }
-  export class ChecklistGenerator {
-    constructor(...args: any[]);
-    generate(...args: any[]): any;
-  }
-  export class RulesRegistry {
-    constructor(...args: any[]);
-    listJurisdictions(): any;
-    getRule(...args: any[]): any;
-  }
-  export class ConnectorRegistry {
-    constructor(...args: any[]);
-  }
-  export const defaultConnectorStateStore: any;
+  export type CaseChecklistContext = import('../../../packages/rules/src/checklist').CaseChecklistContext;
+  export { ChecklistGenerator } from '../../../packages/rules/src/checklist';
+  export { RulesRegistry } from '../../../packages/rules/src/loader';
 }
 
 declare module '@surplus/shared' {
-  export const UPL_DISCLAIMER: string;
-  export const UPL_UI_NOTICE: string;
-  export const AI_OUTPUT_RULES: { rationaleMessages: Set<string> };
-  export const templateRegistry: any;
-  export const NormalizedCaseSchema: any;
-  export type NormalizedCase = any;
-  export function generateCaseRef(...args: any[]): any;
-  export type TemplateDefinition = any;
+  export { UPL_DISCLAIMER, UPL_UI_NOTICE, AI_OUTPUT_RULES } from '../../../packages/shared/src/upl';
+  export { NormalizedCaseSchema } from '../../../packages/shared/src/schemas';
+  export type NormalizedCase = import('../../../packages/shared/src/schemas').NormalizedCase;
+  export type TemplateDefinition = import('../../../packages/shared/src/communications/templates').TemplateDefinition;
+  export { templateRegistry } from '../../../packages/shared/src/communications/templates';
+  export { generateCaseRef } from '../../../packages/shared/src/caseRef';
 }
 
 declare module '@surplus/connectors' {
-  export class ConnectorOrchestrator {
-    constructor(...args: any[]);
-    runAllConnectors(...args: any[]): any;
-    getStatuses(...args: any[]): any;
-  }
-  export class ConnectorRegistry {
-    constructor(...args: any[]);
-  }
-  export const defaultConnectorStateStore: any;
+  export { ConnectorOrchestrator } from '../../../packages/connectors/src/orchestrator';
+  export { ConnectorRegistry } from '../../../packages/connectors/src/registry';
+  export { defaultConnectorStateStore } from '../../../packages/connectors/src/state';
 }
 
 declare module '@surplus/audit' {
-  export class AuditEngine {
-    constructor(...args: any[]);
-    append(...args: any[]): any;
-    verifyChain(...args: any[]): any;
-  }
-  export interface VerificationRange {
-    [key: string]: any;
-  }
-  export interface VerificationResult {
-    [key: string]: any;
-  }
+  export { AuditEngine } from '../../../packages/audit/src';
+  export type VerificationRange = import('../../../packages/audit/src').VerificationRange;
+  export type VerificationResult = import('../../../packages/audit/src').VerificationResult;
 }
-
-declare module '@nestjs/common' {
-  export const Module: any;
-  export const Controller: any;
-  export const Get: any;
-  export const Post: any;
-  export const Param: any;
-  export const Body: any;
-  export const Query: any;
-  export const Res: any;
-  export const StreamableFile: any;
-  export const Injectable: any;
-  export const NotFoundException: any;
-  export const UnauthorizedException: any;
-  export const ForbiddenException: any;
-  export const BadRequestException: any;
-  export const TooManyRequestsException: any;
-  export const UseGuards: any;
-  export const UseInterceptors: any;
-  export const UploadedFile: any;
-  export const UploadedFiles: any;
-  export const ExecutionContext: any;
-  export const CallHandler: any;
-  export const NestInterceptor: any;
-  export const Logger: any;
-  export const LoggerService: any;
-  export const HttpStatus: any;
-  export const HttpException: any;
-  export const SetMetadata: any;
-  export const createParamDecorator: any;
-  export type CanActivate = any;
-  export type ExecutionContext = any;
-  export type CallHandler = any;
-  export type NestInterceptor = any;
-  export type LoggerService = any;
-  export interface INestApplication {
-    [key: string]: any;
-  }
-}
-
-declare module '@nestjs/testing' {
-  export const Test: any;
-  export type TestingModule = any;
-}
-
-declare module 'multer' {
-  export type FileFilterCallback = (...args: any[]) => any;
-  const multer: any;
-  export = multer;
-}
-
-declare module 'express' {
-  export interface Request extends Record<string, any> {}
-  export interface Response extends Record<string, any> {}
-  export interface NextFunction {
-    (...args: any[]): any;
-  }
-}
-
-declare module '*';

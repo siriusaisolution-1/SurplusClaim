@@ -12,6 +12,8 @@ declare module '@prisma/client' {
   export type AuditLog = any;
   export namespace Prisma {
     export type TransactionClient = any;
+    export type InputJsonValue = import('@prisma/client/runtime/library').InputJsonValue;
+    export type JsonValue = import('@prisma/client/runtime/library').JsonValue;
   }
   export class PrismaClient {
     constructor(...args: any[]);

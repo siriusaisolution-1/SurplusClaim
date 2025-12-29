@@ -110,11 +110,13 @@ export class ConsentService {
         }
       });
 
-      const shouldAdvanceToConsent = [
+      const consentEligibleStatuses: CaseStatus[] = [
         CaseStatus.DISCOVERED,
         CaseStatus.TRIAGED,
         CaseStatus.CLIENT_CONTACTED
-      ].includes(caseRecord.status as CaseStatus);
+      ];
+
+      const shouldAdvanceToConsent = consentEligibleStatuses.includes(caseRecord.status);
 
       const updated = shouldAdvanceToConsent
         ? await tx.case.update({ where: { id: caseRecord.id }, data: { status: CaseStatus.CONSENT_SIGNED } })
