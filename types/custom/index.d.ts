@@ -24,10 +24,10 @@ declare module '@prisma/client' {
 }
 
 declare module '@surplus/rules' {
-  export type CaseChecklistContext = any;
+  export type CaseChecklistContext = import('../../packages/rules/src/checklist').CaseChecklistContext;
   export class ChecklistGenerator {
-    constructor(...args: any[]);
-    generate(...args: any[]): any;
+    constructor(registry: import('../../packages/rules/src/loader').RulesRegistry);
+    generate(context: CaseChecklistContext): import('../../packages/rules/src/schemas').ChecklistItem[];
   }
   export class RulesRegistry {
     constructor(...args: any[]);

@@ -4,7 +4,8 @@
 
 declare module '@surplus/rules' {
   export type CaseChecklistContext = import('../../../packages/rules/src/checklist').CaseChecklistContext;
-  export { ChecklistGenerator } from '../../../packages/rules/src/checklist';
+  export type ChecklistItem = import('../../../packages/rules/src/schemas').ChecklistItem;
+  export { CaseChecklistContextSchema, ChecklistGenerator } from '../../../packages/rules/src/checklist';
   export { RulesRegistry } from '../../../packages/rules/src/loader';
 }
 

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CaseChecklistContext, ChecklistGenerator, RulesRegistry } from '@surplus/rules';
+import { ChecklistGenerator, RulesRegistry } from '@surplus/rules';
+import type { CaseChecklistContext } from '@surplus/rules';
 
 @Injectable()
 export class RulesService {
