@@ -2,15 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "baseUrl": ".",
-    "rootDir": "./",
+    "rootDir": "../..",
     "typeRoots": ["./types", "./node_modules/@types"],
-    "paths": {
-      "@surplus/rules": ["./types/shims"],
-      "@surplus/shared": ["./types/shims"],
-      "@surplus/connectors": ["./types/shims"],
-      "@surplus/audit": ["./types/shims"],
-      "@prisma/client": ["./types/shims"]
-    },
     "strict": false,
     "noImplicitAny": false,
     "skipLibCheck": true
