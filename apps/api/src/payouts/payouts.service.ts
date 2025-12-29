@@ -3,12 +3,42 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { CaseStatus, FeeAgreement, TierLevel } from '@prisma/client';
+import { CaseStatus, FeeAgreement, Prisma, TierLevel } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { CasesService } from '../cases/cases.service';
 import { prisma } from '../prisma/prisma.client';
 import { FeeCalculatorService } from './fee-calculator.service';
+
+const payoutWithCaseArgs = Prisma.validator<Prisma.PayoutDefaultArgs>()({
+  include: { case: true }
+});
+
+type PayoutWithCase = Prisma.PayoutGetPayload<typeof payoutWithCaseArgs>;
+
+const invoiceWithCaseArgs = Prisma.validator<Prisma.InvoiceDefaultArgs>()({
+  include: { case: true }
+});
+
+type InvoiceWithCase = Prisma.InvoiceGetPayload<typeof invoiceWithCaseArgs>;
+
+type PayoutListResponse = {
+  payouts: PayoutWithCase[];
+  invoices: InvoiceWithCase[];
+  latestPayout: PayoutWithCase | null;
+  latestInvoice: InvoiceWithCase | null;
+};
+
+type ConfirmPayoutResponse = {
+  payout: PayoutWithCase;
+  invoice: InvoiceWithCase;
+  fee: ReturnType<FeeCalculatorService['calculate']>;
+  status: CaseStatus;
+  evidence: {
+    objectKey: string | null;
+    sha256: string | null;
+  };
+};
 
 const STATE_CAPS: Record<string, number> = {
   CA: 1_250_000, // $12,500
@@ -75,14 +105,16 @@ export class PayoutsService {
     return match ?? null;
   }
 
-  async listForCase(tenantId: string, caseRef: string) {
+  async listForCase(tenantId: string, caseRef: string): Promise<PayoutListResponse> {
     const caseRecord = await this.findCaseOrThrow(tenantId, caseRef);
     const payouts = await prisma.payout.findMany({
       where: { tenantId, caseId: caseRecord.id },
+      include: payoutWithCaseArgs.include,
       orderBy: [{ processedAt: 'desc' }, { createdAt: 'desc' }]
     });
     const invoices = await prisma.invoice.findMany({
       where: { tenantId, caseId: caseRecord.id },
+      include: invoiceWithCaseArgs.include,
       orderBy: [{ issuedAt: 'desc' }, { createdAt: 'desc' }]
     });
 
@@ -105,7 +137,7 @@ export class PayoutsService {
     note?: string;
     contractRef?: string | null;
     closeCase?: boolean;
-  }) {
+  }): Promise<ConfirmPayoutResponse> {
     if (!params.amountCents || params.amountCents <= 0) {
       throw new BadRequestException('A payout amount is required to confirm payout');
     }
@@ -163,7 +195,8 @@ export class PayoutsService {
             agreementId: agreement?.id ?? null,
             evidenceSha256: persistedEvidence?.sha256 ?? null
           }
-        }
+        },
+        include: payoutWithCaseArgs.include
       });
 
       const invoiceRecord = await tx.invoice.create({
@@ -181,7 +214,8 @@ export class PayoutsService {
             min: fee.appliedMinCents ?? undefined,
             rationale: fee.rationale
           }
-        }
+        },
+        include: invoiceWithCaseArgs.include
       });
 
       await tx.caseEvent.create({
