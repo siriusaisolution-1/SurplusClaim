@@ -10,7 +10,9 @@ declare module '@surplus/rules' {
 }
 
 declare module '@surplus/shared' {
-  export { UPL_DISCLAIMER, UPL_UI_NOTICE, AI_OUTPUT_RULES } from '../../../packages/shared/src/upl';
+  export const UPL_DISCLAIMER: typeof import('../../../packages/shared/src/upl').UPL_DISCLAIMER;
+  export const UPL_UI_NOTICE: typeof import('../../../packages/shared/src/upl').UPL_UI_NOTICE;
+  export const AI_OUTPUT_RULES: typeof import('../../../packages/shared/src/upl').AI_OUTPUT_RULES;
   export { NormalizedCaseSchema } from '../../../packages/shared/src/schemas';
   export type NormalizedCase = import('../../../packages/shared/src/schemas').NormalizedCase;
   export type TemplateDefinition = import('../../../packages/shared/src/communications/templates').TemplateDefinition;
