@@ -29,6 +29,13 @@ export class PayoutsController {
       throw new BadRequestException('amountCents is required');
     }
 
+    const attorneyFeeRaw =
+      body.attorneyFeeCents ?? body.attorney_fee_cents ?? body.attorneyFee ?? body.attorney_fee;
+    const parsedAttorneyFee = attorneyFeeRaw ? parseInt(attorneyFeeRaw.toString(), 10) : null;
+    if (!parsedAttorneyFee || Number.isNaN(parsedAttorneyFee)) {
+      throw new BadRequestException('attorneyFeeCents is required');
+    }
+
     const closeCase = body.closeCase === 'true' || body.closeCase === true || body.close_case === 'true';
 
     return this.payoutsService.confirmPayout({
@@ -36,11 +43,11 @@ export class PayoutsController {
       actorId: user.sub,
       caseRef,
       amountCents: parsedAmount,
+      attorneyFeeCents: parsedAttorneyFee,
       currency: body.currency ?? 'USD',
       reference: body.reference ?? undefined,
       evidenceFile: evidence,
       note: body.note ?? undefined,
-      contractRef: body.contractRef ?? body.contract_ref ?? undefined,
       closeCase
     });
   }
