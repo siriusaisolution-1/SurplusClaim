@@ -50,6 +50,11 @@ enum CommunicationChannel {
   SMS
 }
 
+enum LegalExecutionMode {
+  ATTORNEY_REQUIRED
+  OPS_DIRECT
+}
+
 model Tenant {
   id          String   @id @default(uuid()) @db.Uuid
   name        String
@@ -68,6 +73,7 @@ model Tenant {
   communications  Communication[]
   payouts         Payout[]
   sessions        Session[]
+  attorneys       Attorney[]
 
   @@unique([name])
 }
@@ -99,12 +105,17 @@ model Case {
   tierSuggested      TierLevel
   tierConfirmed      TierLevel?
   assignedReviewerId String?   @db.Uuid
+  assignedAttorneyId String?   @db.Uuid
+  legalExecutionMode LegalExecutionMode @default(ATTORNEY_REQUIRED)
+  expectedPayoutWindow String?
+  closureConfirmationRequired Boolean @default(false)
   metadata           Json?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
   tenant           Tenant @relation(fields: [tenantId], references: [id])
   assignedReviewer User?  @relation("CaseReviewer", fields: [assignedReviewerId], references: [id])
+  assignedAttorney Attorney? @relation("CaseAttorney", fields: [assignedAttorneyId], references: [id])
   events           CaseEvent[]
   artifacts        Artifact[]
   documents        Document[]
@@ -117,6 +128,24 @@ model Case {
   @@unique([tenantId, caseRef])
   @@index([tenantId, status])
   @@index([tenantId, caseRef])
+  @@index([tenantId, assignedAttorneyId])
+}
+
+model Attorney {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  fullName  String
+  email     String?
+  phone     String?
+  barNumber String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  cases  Case[] @relation("CaseAttorney")
+
+  @@unique([tenantId, email])
+  @@index([tenantId, barNumber])
 }
 
 model CaseEvent {

@@ -21,11 +21,7 @@ async function bootstrapApp(): Promise<INestApplication> {
 }
 
 async function seedTenants() {
-  await prisma.auditLog.deleteMany({});
-  await prisma.session.deleteMany({});
-  await prisma.case.deleteMany({});
-  await prisma.user.deleteMany({});
-  await prisma.tenant.deleteMany({});
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE "Tenant" CASCADE;');
 
   const tenantA = await prisma.tenant.create({ data: { name: 'Tenant A' } });
   const tenantB = await prisma.tenant.create({ data: { name: 'Tenant B' } });

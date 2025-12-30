@@ -47,6 +47,12 @@ export class CasesController {
         assignedReviewer: item.assignedReviewer
           ? { id: item.assignedReviewer.id, email: item.assignedReviewer.email }
           : null,
+        assignedAttorney: item.assignedAttorney
+          ? { id: item.assignedAttorney.id, name: item.assignedAttorney.fullName, email: item.assignedAttorney.email }
+          : null,
+        legalExecutionMode: item.legalExecutionMode,
+        expectedPayoutWindow: item.expectedPayoutWindow,
+        closureConfirmationRequired: item.closureConfirmationRequired,
         metadata: item.metadata,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt
@@ -101,6 +107,16 @@ export class CasesController {
         reviewer: details.caseRecord.assignedReviewer
           ? { id: details.caseRecord.assignedReviewer.id, email: details.caseRecord.assignedReviewer.email }
           : null,
+        attorney: details.caseRecord.assignedAttorney
+          ? {
+              id: details.caseRecord.assignedAttorney.id,
+              name: details.caseRecord.assignedAttorney.fullName,
+              email: details.caseRecord.assignedAttorney.email
+            }
+          : null,
+        legalExecutionMode: details.caseRecord.legalExecutionMode,
+        expectedPayoutWindow: details.caseRecord.expectedPayoutWindow,
+        closureConfirmationRequired: details.caseRecord.closureConfirmationRequired,
         metadata: details.caseRecord.metadata,
         createdAt: details.caseRecord.createdAt,
         updatedAt: details.caseRecord.updatedAt
