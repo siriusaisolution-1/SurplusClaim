@@ -85,6 +85,25 @@ async function main() {
     }
   });
 
+  await prisma.payout.create({
+    data: {
+      tenantId: tenant.id,
+      caseId: closureBlocked.id,
+      caseRef: closureBlocked.caseRef,
+      amountCents: 7500,
+      currency: 'USD',
+      status: 'CONFIRMED',
+      reference: 'ready-to-close',
+      processedAt: new Date(),
+      confirmedAt: new Date(),
+      confirmedBy: actor.id,
+      evidenceKey: 'closure-artifact',
+      feeCents: 1500,
+      feeRateBps: 1000,
+      metadata: { attorneyFeeCents: 3000, evidenceSha256: 'closure-hash' }
+    }
+  });
+
   await assert.rejects(
     () =>
       casesService.transitionCase(tenant.id, actor.id, closureBlocked.caseRef, {
