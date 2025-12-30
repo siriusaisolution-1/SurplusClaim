@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { CaseStatus, FeeAgreement, Prisma, TierLevel } from '@prisma/client';
+import { CaseStatus, Prisma } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { CasesService } from '../cases/cases.service';
@@ -40,12 +40,6 @@ type ConfirmPayoutResponse = {
   };
 };
 
-const STATE_CAPS: Record<string, number> = {
-  CA: 1_250_000, // $12,500
-  NY: 900_000, // $9,000
-  TX: 750_000 // $7,500
-};
-
 @Injectable()
 export class PayoutsService {
   constructor(
@@ -76,35 +70,6 @@ export class PayoutsService {
     return caseRecord;
   }
 
-  private async resolveAgreement(
-    tenantId: string,
-    tierBand: 'TIER_A' | 'TIER_B' | 'TIER_C',
-    stateCode?: string,
-    contractRef?: string | null
-  ): Promise<FeeAgreement | null> {
-    const agreements = await prisma.feeAgreement.findMany({
-      where: {
-        tenantId,
-        ...(stateCode ? { stateCode } : {}),
-        ...(contractRef ? { contractRef } : {})
-      },
-      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }]
-    });
-
-    const orderedTiers: TierLevel[] = [TierLevel.LOW, TierLevel.MEDIUM, TierLevel.HIGH, TierLevel.ENTERPRISE];
-    const tierIndex = tierBand === 'TIER_A' ? 0 : tierBand === 'TIER_B' ? 1 : 2;
-    const tierValue = orderedTiers[tierIndex];
-
-    const match = agreements.find((agreement) => {
-      const minIdx = orderedTiers.indexOf(agreement.tierMin);
-      const maxIdx = orderedTiers.indexOf(agreement.tierMax);
-      const targetIdx = orderedTiers.indexOf(tierValue);
-      return targetIdx >= minIdx && targetIdx <= maxIdx;
-    });
-
-    return match ?? null;
-  }
-
   async listForCase(tenantId: string, caseRef: string): Promise<PayoutListResponse> {
     const caseRecord = await this.findCaseOrThrow(tenantId, caseRef);
     const payouts = await prisma.payout.findMany({
@@ -131,38 +96,25 @@ export class PayoutsService {
     actorId: string;
     caseRef: string;
     amountCents: number;
+    attorneyFeeCents: number;
     currency?: string;
     reference?: string;
     evidenceFile?: Express.Multer.File | null;
     note?: string;
-    contractRef?: string | null;
     closeCase?: boolean;
   }): Promise<ConfirmPayoutResponse> {
     if (!params.amountCents || params.amountCents <= 0) {
       throw new BadRequestException('A payout amount is required to confirm payout');
     }
+    if (!params.attorneyFeeCents || params.attorneyFeeCents <= 0) {
+      throw new BadRequestException('An attorney fee amount is required to confirm payout');
+    }
     if (!params.evidenceFile) {
-      throw new BadRequestException('Evidence upload is required to confirm payout');
+      throw new BadRequestException('Trust disbursement evidence upload is required to confirm payout');
     }
 
     const caseRecord = await this.findCaseOrThrow(params.tenantId, params.caseRef);
-    const tierBand = this.feeCalculator.mapTierLevelToBand(caseRecord.tierConfirmed ?? caseRecord.tierSuggested);
-    const jurisdictionState = (caseRecord.metadata as any)?.jurisdiction?.state as string | undefined;
-    const contractMetadata = (caseRecord.metadata as any)?.b2bContract ?? (caseRecord.metadata as any)?.b2b_contract;
-    const contractRateBps: number | undefined = contractMetadata?.rate_bps ?? contractMetadata?.rateBps;
-    const contractRef = params.contractRef ?? contractMetadata?.contract_ref ?? contractMetadata?.contractRef;
-
-    const agreement = await this.resolveAgreement(params.tenantId, tierBand, jurisdictionState, contractRef ?? null);
-    const fee = this.feeCalculator.calculate({
-      amountCents: params.amountCents,
-      tierBand,
-      stateCode: jurisdictionState,
-      agreement,
-      contractRateBps: contractRateBps ?? undefined,
-      b2bRateBps: agreement?.b2bOverride ?? undefined,
-      minimumFeeCents: agreement?.minFeeCents ?? undefined,
-      stateCaps: STATE_CAPS
-    });
+    const fee = this.feeCalculator.calculate({ attorneyFeeCents: params.attorneyFeeCents });
 
     const evidenceKey = params.evidenceFile
       ? this.buildEvidenceKey(caseRecord.caseRef, params.evidenceFile.originalname)
@@ -190,9 +142,7 @@ export class PayoutsService {
           metadata: {
             note: params.note ?? null,
             feeRationale: fee.rationale,
-            contractRef: contractRef ?? null,
-            stateCap: jurisdictionState ? STATE_CAPS[jurisdictionState] ?? null : null,
-            agreementId: agreement?.id ?? null,
+            attorneyFeeCents: params.attorneyFeeCents,
             evidenceSha256: persistedEvidence?.sha256 ?? null
           }
         },
@@ -212,7 +162,8 @@ export class PayoutsService {
           metadata: {
             cap: fee.appliedCapCents ?? undefined,
             min: fee.appliedMinCents ?? undefined,
-            rationale: fee.rationale
+            rationale: fee.rationale,
+            attorneyFeeCents: params.attorneyFeeCents
           }
         },
         include: invoiceWithCaseArgs.include
@@ -248,12 +199,11 @@ export class PayoutsService {
         payoutId: payout.id,
         invoiceId: invoice.id,
         amountCents: params.amountCents,
+        attorneyFeeCents: params.attorneyFeeCents,
         feeCents: fee.feeCents,
         rateBps: fee.appliedRateBps,
         capApplied: fee.appliedCapCents ?? null,
         minApplied: fee.appliedMinCents ?? null,
-        state: jurisdictionState ?? null,
-        contractRef: contractRef ?? null,
         rationale: fee.rationale
       }
     });

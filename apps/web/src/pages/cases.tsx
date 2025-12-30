@@ -186,6 +186,7 @@ interface PayoutRecord {
   evidenceKey?: string | null;
   processedAt?: string | null;
   confirmedAt?: string | null;
+  metadata?: Record<string, unknown> | null;
   createdAt: string;
 }
 
@@ -207,6 +208,14 @@ const formatTierLabel = (tier?: string | null) => {
 const formatCurrency = (amountCents?: number | null) => {
   if (amountCents === null || amountCents === undefined) return '—';
   return `$${(amountCents / 100).toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;
+};
+
+const getNumberMetadataValue = (
+  metadata: Record<string, unknown> | null | undefined,
+  key: string
+): number | undefined => {
+  const value = metadata?.[key];
+  return typeof value === 'number' ? value : undefined;
 };
 
 export default function CasesPage() {
@@ -254,9 +263,10 @@ export default function CasesPage() {
     latestInvoice: InvoiceRecord | null;
   }>({ latestPayout: null, latestInvoice: null });
   const [payoutAmount, setPayoutAmount] = useState('');
+  const [attorneyFeeAmount, setAttorneyFeeAmount] = useState('');
   const [payoutReference, setPayoutReference] = useState('');
   const [payoutNote, setPayoutNote] = useState('');
-  const [payoutEvidence, setPayoutEvidence] = useState<File | null>(null);
+  const [trustDisbursementEvidence, setTrustDisbursementEvidence] = useState<File | null>(null);
   const [payoutStatus, setPayoutStatus] = useState<string | null>(null);
   const [closeAfterPayout, setCloseAfterPayout] = useState(true);
 
@@ -624,13 +634,25 @@ export default function CasesPage() {
       return;
     }
 
+    const parsedAttorneyFee = Math.round(parseFloat(attorneyFeeAmount || '0') * 100);
+    if (!parsedAttorneyFee || Number.isNaN(parsedAttorneyFee)) {
+      setPayoutStatus('Enter the realized attorney fee to calculate the platform fee');
+      return;
+    }
+
+    if (!trustDisbursementEvidence) {
+      setPayoutStatus('Upload trust disbursement evidence to confirm payout');
+      return;
+    }
+
     setPayoutStatus('Confirming payout...');
     try {
       const formData = new FormData();
       formData.append('amountCents', parsedAmount.toString());
+      formData.append('attorneyFeeCents', parsedAttorneyFee.toString());
       if (payoutReference) formData.append('reference', payoutReference);
       if (payoutNote) formData.append('note', payoutNote);
-      if (payoutEvidence) formData.append('evidence', payoutEvidence);
+      formData.append('evidence', trustDisbursementEvidence);
       if (closeAfterPayout) formData.append('closeCase', 'true');
 
       const response = await fetch(`${API_BASE_URL}/cases/${selectedRef}/payouts/confirm`, {
@@ -647,8 +669,9 @@ export default function CasesPage() {
       const payload = await response.json();
       setPayoutSummary({ latestInvoice: payload.invoice ?? null, latestPayout: payload.payout ?? null });
       setPayoutStatus('Payout confirmed and invoice drafted.');
-      setPayoutEvidence(null);
+      setTrustDisbursementEvidence(null);
       setPayoutAmount('');
+      setAttorneyFeeAmount('');
       setPayoutReference('');
       setPayoutNote('');
       await fetchCaseDetail(selectedRef);
@@ -838,6 +861,10 @@ export default function CasesPage() {
   const formattedCaseList = useMemo(() => caseList, [caseList]);
   const latestInvoice = payoutSummary.latestInvoice;
   const latestPayout = payoutSummary.latestPayout;
+  const latestInvoiceAttorneyFeeCents = getNumberMetadataValue(latestInvoice?.metadata ?? null, 'attorneyFeeCents');
+  const latestInvoiceCapCents = getNumberMetadataValue(latestInvoice?.metadata ?? null, 'cap');
+  const latestInvoiceMinCents = getNumberMetadataValue(latestInvoice?.metadata ?? null, 'min');
+  const latestPayoutAttorneyFeeCents = getNumberMetadataValue(latestPayout?.metadata ?? null, 'attorneyFeeCents');
 
   if (!user) return <div className="main-shell" />;
 
@@ -1382,7 +1409,8 @@ export default function CasesPage() {
                 <div style={{ marginTop: '1.25rem' }}>
                   <h4>Payout confirmation & success fee</h4>
                   <p style={{ color: '#9ca3af', marginTop: '-0.25rem' }}>
-                    Success fees are calculated only after payout confirmation. State caps, minimums, and B2B overrides are applied automatically and logged.
+                    Success fees are calculated only after payout confirmation. Phase 1 CA rule applies a 12% platform fee on
+                    the realized attorney fee with trust disbursement evidence required for payout confirmation.
                   </p>
                   <div
                     style={{
@@ -1407,6 +1435,21 @@ export default function CasesPage() {
                           />
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <label className="input-label">Realized attorney fee (USD)</label>
+                          <input
+                            className="input"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={attorneyFeeAmount}
+                            onChange={(e) => setAttorneyFeeAmount(e.target.value)}
+                            placeholder="e.g., 7500.00"
+                          />
+                          <span style={{ color: '#9ca3af', fontSize: '0.9rem', marginTop: '0.15rem' }}>
+                            Platform fee is 12% of the realized attorney fee.
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
                           <label className="input-label">Reference</label>
                           <input
                             className="input"
@@ -1425,11 +1468,13 @@ export default function CasesPage() {
                           onChange={(e) => setPayoutNote(e.target.value)}
                           placeholder="Notes about caps, overrides, or jurisdictional nuances"
                         />
-                        <label className="input-label">Evidence upload (required for confirmation)</label>
+                        <label className="input-label">Trust disbursement evidence (required)</label>
                         <input
                           className="input"
                           type="file"
-                          onChange={(e) => setPayoutEvidence(e.target.files ? e.target.files[0] : null)}
+                          onChange={(e) =>
+                            setTrustDisbursementEvidence(e.target.files ? e.target.files[0] : null)
+                          }
                         />
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#9ca3af' }}>
                           <input
@@ -1439,7 +1484,11 @@ export default function CasesPage() {
                           />
                           Close case after payout confirmation
                         </label>
-                        <button className="button" onClick={handleConfirmPayout} disabled={!payoutEvidence}>
+                        <button
+                          className="button"
+                          onClick={handleConfirmPayout}
+                          disabled={!trustDisbursementEvidence}
+                        >
                           Confirm payout and generate invoice
                         </button>
                         {payoutStatus && <div style={{ color: '#9ca3af' }}>{payoutStatus}</div>}
@@ -1457,11 +1506,16 @@ export default function CasesPage() {
                             </div>
                             <div>Status: <span className="tag">{latestInvoice.status}</span></div>
                             <div>Issued: {new Date(latestInvoice.issuedAt).toLocaleString()}</div>
-                            {latestInvoice.metadata?.cap && (
-                              <div>Cap enforced: {formatCurrency(latestInvoice.metadata.cap as number)}</div>
+                            {latestInvoiceAttorneyFeeCents !== undefined && (
+                              <div>
+                                Attorney fee basis: {formatCurrency(latestInvoiceAttorneyFeeCents)}
+                              </div>
                             )}
-                            {latestInvoice.metadata?.min && (
-                              <div>Minimum enforced: {formatCurrency(latestInvoice.metadata.min as number)}</div>
+                            {latestInvoiceCapCents !== undefined && (
+                              <div>Cap enforced: {formatCurrency(latestInvoiceCapCents)}</div>
+                            )}
+                            {latestInvoiceMinCents !== undefined && (
+                              <div>Minimum enforced: {formatCurrency(latestInvoiceMinCents)}</div>
                             )}
                           </>
                         ) : (
@@ -1473,6 +1527,9 @@ export default function CasesPage() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
                               <div>Amount: {formatCurrency(latestPayout.amountCents)}</div>
                               <div>Fee: {formatCurrency(latestPayout.feeCents ?? null)}</div>
+                              {latestPayoutAttorneyFeeCents !== undefined && (
+                                <div>Attorney fee: {formatCurrency(latestPayoutAttorneyFeeCents)}</div>
+                              )}
                               <div>Reference: {latestPayout.reference ?? '—'}</div>
                               <div>Evidence: {latestPayout.evidenceKey ?? '—'}</div>
                               <div>Status: <span className="tag">{latestPayout.status}</span></div>
