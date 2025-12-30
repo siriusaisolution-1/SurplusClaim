@@ -104,6 +104,15 @@ export class PayoutsService {
     }
 
     const caseRecord = await this.findCaseOrThrow(params.tenantId, params.caseRef);
+    const payout = await prisma.payout.findFirst({
+      where: { tenantId: params.tenantId, caseId: caseRecord.id },
+      orderBy: [{ processedAt: 'desc' }, { createdAt: 'desc' }]
+    });
+
+    if (!payout) {
+      throw new BadRequestException('No payout found to attach evidence to');
+    }
+
     const evidenceKey = this.buildEvidenceKey(caseRecord.caseRef, params.evidenceFile.originalname);
     const persistedEvidence = await this.persistEvidence(evidenceKey, params.evidenceFile.buffer);
 
@@ -125,12 +134,12 @@ export class PayoutsService {
         caseId: caseRecord.id,
         caseRef: caseRecord.caseRef,
         action: 'PAYOUT_EVIDENCE_CHAINED',
-        metadata: {
-          payoutId: payout.id,
-          artifactId: artifact.id,
-          evidenceKey: payout.evidenceKey,
-          sha256: (persistedEvidence as any)?.sha256 ?? null
-        }
+          metadata: {
+            payoutId: payout.id,
+            artifactId: artifact.id,
+            evidenceKey,
+            sha256: (persistedEvidence as any)?.sha256 ?? null
+          }
       });
     }
 

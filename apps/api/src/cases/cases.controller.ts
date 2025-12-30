@@ -26,7 +26,7 @@ export class CasesController {
     @Query('pageSize') pageSize?: string
   ) {
     const parsedStatus = status && Object.values(CaseStatus).includes(status) ? status : undefined;
-    const response = await this.casesService.listCases(user.tenantId, {
+    const response: any = await this.casesService.listCases(user.tenantId, {
       status: parsedStatus,
       search,
       needsTriage: needsTriage === 'true',
@@ -74,7 +74,7 @@ export class CasesController {
   @Get(':caseRef')
   @Roles('TENANT_ADMIN', 'REVIEWER', 'OPS', 'READ_ONLY')
   async getCase(@Param('caseRef') caseRef: string, @CurrentUser() user: any) {
-    const details = await this.casesService.getCaseWithTimeline(user.tenantId, caseRef);
+    const details: any = await this.casesService.getCaseWithTimeline(user.tenantId, caseRef);
 
     if (!details) {
       await this.auditService.logAction({
