@@ -1,0 +1,381 @@
+Plan razvoja v2
+
+CODEX MASTER RULES (PASTE FIRST IN NEW CONVO)
+
+You are working in a pnpm monorepo with apps/api (NestJS), apps/web (Next.js), apps/worker (NestJS), packages/* shared libs, and services/scraper (Scrapy/Scrapyd).
+
+NON-NEGOTIABLE RULES:
+1) One prompt = one PR-sized change set. Do NOT do unrelated refactors.
+2) Before editing, print: (a) files you will touch, (b) why.
+3) Always run the repo’s existing CI-equivalent commands locally (in this environment) and report outputs.
+4) If DB secrets are unavailable, tests/migrations must be guarded (skip gracefully), but ONLY where strictly needed.
+5) No free-text legal advice features. AI outputs must be schema-validated and templated.
+6) Every case must have a CaseRef (TS-STATE-COUNTY-YYYYMMDD-RANDOM-CHECKDIGIT) and it must be written into: DB record, all generated docs, email subject/body.
+
+GLOBAL DO NOTS:
+- Do not loosen TypeScript strictness globally.
+- Do not disable lint/test globally. Only add targeted overrides or guards when justified.
+- Do not change business logic unless requested.
+
+DELIVERABLES PER PROMPT:
+- Summary (what changed)
+- Files changed
+- How to verify (exact commands)
+- Risks / follow-ups
+
+PROMPT P1 — REPO BASELINE & “GREEN PIPELINE” GUARANTEE
+
+Goal: Establish a deterministic, stable CI baseline that doesn’t randomly fail and matches Vercel constraints.
+
+Tasks:
+1) Inspect .github/workflows/ci.yml and ensure:
+   - pnpm version is pinned via corepack
+   - install uses pnpm install --frozen-lockfile (or explain why not)
+   - Postgres service is used consistently
+   - Prisma migrate deploy runs ONLY when DATABASE_URL exists AND schema file exists
+2) Ensure `pnpm lint`, `pnpm exec tsc -p apps/*/tsconfig.json --noEmit`, `pnpm test`, and `pnpm -r --filter "./apps/**" build` are all runnable in CI.
+3) If some tests require external secrets (beyond CI postgres), create guards that skip those tests with clear logs (NOT silent).
+4) Provide a “CI Modes” section in README:
+   - PR mode (no destructive DB, guarded secrets)
+   - main push mode (migrate deploy + full integration tests)
+
+Constraints:
+- Minimal edits.
+- No disabling lint/typecheck globally.
+
+Output:
+- Files changed
+- Commands to verify
+
+PROMPT P2 — CORE DOMAIN: Case model v2 compliance (API + DB)
+
+Goal: Implement Project Specification v2 mandatory case fields + server-side status guardrails.
+
+Requirements (from spec v2):
+Case must include:
+- legal_execution_mode
+- assigned_attorney_id
+- expected_payout_window
+- closure_confirmation_required
+And case must NOT enter PAYOUT_CONFIRMED unless these fields are set.
+
+Tasks:
+1) Inspect Prisma schema (apps/api/prisma/schema.prisma) and Case model.
+2) Add missing fields + enums as needed.
+3) Add migration(s) and ensure prisma generate works.
+4) Update API DTOs/validators and service logic:
+   - enforce status transition guardrails
+   - validate required fields at the correct points (server-side)
+5) Add unit tests for status transitions.
+
+Constraints:
+- No UI changes in this prompt.
+- No changes to connectors/rules.
+
+Deliverables:
+- Files changed
+- How to verify (commands)
+- Test coverage added
+
+PROMPT P3 — CaseRef system: generation, persistence, propagation everywhere
+
+Goal: Every case has a deterministic CaseRef. It is used in DB, subject lines, docs, and audit.
+
+Tasks:
+1) Confirm packages/shared/src/caseRef.ts exports:
+   - generateCaseRef({ state, countycode, date })
+   - validateCaseRef
+   - parseCaseRef
+   - extractCaseRefFromText
+2) Fix any Node import issues (crypto default import) without changing behavior:
+   - use `import * as crypto from 'crypto'` or `import { randomBytes } from 'crypto'`.
+3) In API:
+   - On case creation (ingestion or manual), assign caseRef if missing.
+   - Add unique index on caseRef.
+4) Add helpers so every generated artifact includes caseRef in:
+   - filename
+   - document footer/header metadata
+5) Add tests for CaseRef generation + uniqueness + validation.
+
+Constraints:
+- No new features, only propagation.
+- Keep minimal.
+
+Deliverables:
+- Files changed
+- Verification commands
+
+PROMPT P4 — Rules Engine (state/county config) v1: YAML-driven, Zod-validated
+
+Goal: Config-driven rules per jurisdiction (state/county) to generate checklists & procedural metadata.
+
+Tasks:
+1) Ensure packages/rules has:
+   - Zod schema for jurisdiction YAML
+   - loader with stable snapshots/tests
+2) Implement:
+   - /rules/jurisdictions
+   - /rules/:state/:countyCode
+   - checklist generator for a given case context
+3) Store jurisdiction context on cases:
+   - state, countyCode, ruleVersion/hash
+4) Add snapshot tests for 3–5 CA counties (from your MVP list) and ensure stable outputs.
+
+Constraints:
+- No scraping changes here.
+- Must not hardcode logic in TS; YAML is source-of-truth.
+
+Deliverables:
+- YAML samples
+- Files changed
+- Commands to verify
+
+PROMPT P5 — Connector Registry & Ingestion pipeline: strict normalized schema + dedupe
+
+Goal: Automated discovery pipeline that:
+- schedules connectors
+- validates normalized output (Zod)
+- deduplicates
+- creates/updates cases
+- audit logs every run
+
+Tasks:
+1) Ensure packages/connectors exports:
+   - ConnectorRegistry
+   - NormalizedCase schema/types
+   - ingestion utilities
+2) Fix module resolution so apps/api can import @surplus/connectors and @surplus/rules reliably:
+   - packages must emit .d.ts and have correct package.json "main/types"
+   - TS configs should not include sibling package src files in apps tsconfig (consume built outputs)
+3) Implement run records:
+   - connector_runs table
+   - cursors (hash/version)
+4) Add tests:
+   - invalid payload rejects
+   - dedupe works
+   - new-entry suppression works
+
+Constraints:
+- No UI changes.
+- Strict validation (no swallow).
+
+Deliverables:
+- Files changed
+- Verify commands
+
+PROMPT P6 — Worker orchestration: scheduling, retries, and audit trail
+
+Goal: apps/worker runs:
+- periodic connector polling
+- enqueue jobs
+- retries/backoff
+- writes audit events
+
+Tasks:
+1) Add a simple scheduler loop:
+   - intervals per connector
+   - last-run stored and respected
+2) Add retry policy:
+   - exponential backoff
+   - max attempts
+3) Add worker /health endpoint + status summary route.
+4) Ensure worker builds/typechecks in CI.
+
+Constraints:
+- Do not add external cron dependency if not necessary.
+- Keep deterministic.
+
+Deliverables:
+- Files changed
+- Verify commands
+
+PROMPT P7 — Client Engagement & Consent (Phase C): templated email + consent versioning
+
+Goal: Implement the “Client Engagement & Consent” flow without UPL risk.
+
+Rules:
+- System must NOT give legal advice.
+- Email content must be based on fixed templates with variable substitution.
+- AI may only choose template + fill schema fields.
+
+Tasks:
+1) Create email template set (packages/shared):
+   - discovery notice
+   - consent request
+   - missing-docs reminder
+   - submission reminder
+   Subject must include CaseRef.
+2) API endpoints:
+   - create consent request
+   - record consent acceptance
+   - store consent_version + timestamp + actor
+3) Add audit events for all actions.
+4) Tests:
+   - template render
+   - consent cannot be bypassed
+
+Deliverables:
+- Template files
+- Verification commands
+
+PROMPT P8 — Document collection & checklist completion (Phase D)
+
+Goal: Collect docs from client, map to checklist items, and store with audit.
+
+Tasks:
+1) Implement documents:
+   - upload (metadata only if storage not ready)
+   - categorize (ID, proof, notarization, etc.)
+   - link to checklist item
+2) Implement checklist progress computation per case.
+3) Ensure every document record includes:
+   - caseRef
+   - checksum/hash
+   - uploader
+   - timestamp
+4) Tests for document flows.
+
+Constraints:
+- No external storage integration yet unless already configured.
+
+Deliverables:
+- Files changed
+- Verify commands
+
+PROMPT P9 — Claim Package Builder (Phase D): ZIP + standardized forms (no modification)
+
+Goal: Generate a “claim package”:
+- checklist summary
+- filled standard forms (only if fields exist; no rewriting text)
+- attach uploaded documents
+- produce a ZIP output
+
+Tasks:
+1) Implement a package generator module in API:
+   - input: caseId
+   - output: zip artifact record
+2) Ensure package includes caseRef in:
+   - zip filename
+   - every document name
+3) Add “ready for submission” status gate: only if checklist complete.
+
+Constraints:
+- No county filing, no court comms.
+- Forms are filled only via defined field mapping.
+
+Deliverables:
+- Verify commands
+- Basic test ensuring zip is generated
+
+PROMPT P10 — Submission Coordination (Phase E): reminders + status lifecycle
+
+Goal: Track submission without submitting.
+- client self-submits OR partner submits
+- system tracks milestones + sends reminders
+
+Tasks:
+1) Add statuses:
+   - PACKAGE_READY
+   - SUBMITTED_BY_CLIENT
+   - SUBMITTED_BY_PARTNER
+   - AWAITING_RESPONSE
+2) Add reminders with fixed templates (CaseRef in subject).
+3) Add audit trail for each state transition.
+
+Deliverables:
+- Verify commands
+- Tests for lifecycle
+
+PROMPT P11 — Monetization (Phase F): Payout confirmation + 12% platform fee of attorney fee (CA Phase 1)
+
+Goal: Implement v2 monetization:
+- platform fee = 12% of realized attorney fee (CA phase 1)
+- triggered only after payout confirmation + trust summary upload
+- implement lock-in & enforcement
+
+Tasks:
+1) Add payout confirmation flow:
+   - upload trust summary
+   - confirm payout amount
+   - confirm attorney fee
+2) Compute platform fee 12%
+3) Add “BLOCKED” enforcement rules:
+   - if no closure confirmation after X days, block new cases and show reason
+4) Tests:
+   - fee computation
+   - enforcement triggers
+
+Deliverables:
+- Verify commands
+
+PROMPT P12 — Web UI MVP: case list, case detail, checklist, docs, payout confirmation
+
+Goal: Minimal UI that supports the operational workflow.
+
+Tasks:
+1) /login page already exists; keep.
+2) Add:
+   - /cases list (search by CaseRef)
+   - /cases/[id] detail:
+     - status timeline
+     - checklist view
+     - upload docs
+     - generate package button
+     - payout confirmation section (only when allowed)
+3) Add /health (already exists) and ensure / always works.
+
+Constraints:
+- No complex design.
+- Use server-side rendering where simple.
+
+Deliverables:
+- Verify web build on Vercel
+- Commands
+
+PROMPT P13 — Security & Compliance hardening (UPL boundaries, authZ, audit immutability)
+
+Goal: Make it “hard to accidentally violate UPL boundaries”.
+
+Tasks:
+1) Add “UPL Guardrails”:
+   - forbid free text responses to client
+   - enforce template-only communications
+2) RBAC:
+   - admin
+   - reviewer
+   - attorney/partner
+3) Make audit log append-only and tamper-evident (hash chain per tenant).
+4) Add security tests or checks.
+
+Deliverables:
+- Verify commands
+- Threat model summary (short)
+
+PROMPT P14 — Observability: health dashboards + connector status + alerts
+
+Goal:
+- /health for api/worker/web
+- /connectors/status with last-run metrics
+- basic logging, correlation id, caseRef in logs
+
+Deliverables:
+- Verify commands
+
+PROMPT P15 — End-to-end “Happy Path” test scenario (no real filing)
+
+Goal: One automated test (or e2e script) that simulates:
+- discovery creates case
+- consent requested and accepted
+- docs uploaded
+- package generated
+- submission status updated
+- payout confirmed
+- platform fee computed
+
+Constraints:
+- Use CI Postgres.
+- No external secrets.
+
+Deliverables:
+- e2e script/test
+- commands
