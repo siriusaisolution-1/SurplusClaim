@@ -210,6 +210,14 @@ const formatCurrency = (amountCents?: number | null) => {
   return `$${(amountCents / 100).toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;
 };
 
+const getNumberMetadataValue = (
+  metadata: Record<string, unknown> | null | undefined,
+  key: string
+): number | undefined => {
+  const value = metadata?.[key];
+  return typeof value === 'number' ? value : undefined;
+};
+
 export default function CasesPage() {
   const { user, loading, accessToken } = useAuth();
   const router = useRouter();
@@ -853,6 +861,10 @@ export default function CasesPage() {
   const formattedCaseList = useMemo(() => caseList, [caseList]);
   const latestInvoice = payoutSummary.latestInvoice;
   const latestPayout = payoutSummary.latestPayout;
+  const latestInvoiceAttorneyFeeCents = getNumberMetadataValue(latestInvoice?.metadata ?? null, 'attorneyFeeCents');
+  const latestInvoiceCapCents = getNumberMetadataValue(latestInvoice?.metadata ?? null, 'cap');
+  const latestInvoiceMinCents = getNumberMetadataValue(latestInvoice?.metadata ?? null, 'min');
+  const latestPayoutAttorneyFeeCents = getNumberMetadataValue(latestPayout?.metadata ?? null, 'attorneyFeeCents');
 
   if (!user) return <div className="main-shell" />;
 
@@ -1494,17 +1506,16 @@ export default function CasesPage() {
                             </div>
                             <div>Status: <span className="tag">{latestInvoice.status}</span></div>
                             <div>Issued: {new Date(latestInvoice.issuedAt).toLocaleString()}</div>
-                            {latestInvoice.metadata?.attorneyFeeCents && (
+                            {latestInvoiceAttorneyFeeCents !== undefined && (
                               <div>
-                                Attorney fee basis:{' '}
-                                {formatCurrency(latestInvoice.metadata.attorneyFeeCents as number)}
+                                Attorney fee basis: {formatCurrency(latestInvoiceAttorneyFeeCents)}
                               </div>
                             )}
-                            {latestInvoice.metadata?.cap && (
-                              <div>Cap enforced: {formatCurrency(latestInvoice.metadata.cap as number)}</div>
+                            {latestInvoiceCapCents !== undefined && (
+                              <div>Cap enforced: {formatCurrency(latestInvoiceCapCents)}</div>
                             )}
-                            {latestInvoice.metadata?.min && (
-                              <div>Minimum enforced: {formatCurrency(latestInvoice.metadata.min as number)}</div>
+                            {latestInvoiceMinCents !== undefined && (
+                              <div>Minimum enforced: {formatCurrency(latestInvoiceMinCents)}</div>
                             )}
                           </>
                         ) : (
@@ -1516,10 +1527,8 @@ export default function CasesPage() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
                               <div>Amount: {formatCurrency(latestPayout.amountCents)}</div>
                               <div>Fee: {formatCurrency(latestPayout.feeCents ?? null)}</div>
-                              {latestPayout.metadata?.attorneyFeeCents && (
-                                <div>
-                                  Attorney fee: {formatCurrency(latestPayout.metadata.attorneyFeeCents as number)}
-                                </div>
+                              {latestPayoutAttorneyFeeCents !== undefined && (
+                                <div>Attorney fee: {formatCurrency(latestPayoutAttorneyFeeCents)}</div>
                               )}
                               <div>Reference: {latestPayout.reference ?? '—'}</div>
                               <div>Evidence: {latestPayout.evidenceKey ?? '—'}</div>
