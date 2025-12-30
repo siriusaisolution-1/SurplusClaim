@@ -37,6 +37,7 @@ type ConfirmPayoutResponse = {
   evidence: {
     objectKey: string | null;
     sha256: string | null;
+    artifactId?: string | null;
   };
 };
 
@@ -91,6 +92,65 @@ export class PayoutsService {
     };
   }
 
+  async uploadEvidence(params: {
+    tenantId: string;
+    actorId: string;
+    caseRef: string;
+    evidenceFile?: Express.Multer.File | null;
+    note?: string;
+  }) {
+    if (!params.evidenceFile) {
+      throw new BadRequestException('Evidence file is required');
+    }
+
+    const caseRecord = await this.findCaseOrThrow(params.tenantId, params.caseRef);
+    const evidenceKey = this.buildEvidenceKey(caseRecord.caseRef, params.evidenceFile.originalname);
+    const persistedEvidence = await this.persistEvidence(evidenceKey, params.evidenceFile.buffer);
+
+    const artifact = await prisma.artifact.create({
+      data: {
+        tenantId: params.tenantId,
+        caseId: caseRecord.id,
+        caseRef: caseRecord.caseRef,
+        objectKey: evidenceKey,
+        sha256: persistedEvidence.sha256,
+        source: 'payout_confirmation'
+      }
+    });
+
+    if (artifact) {
+      await this.auditService.logAction({
+        tenantId: params.tenantId,
+        actorId: params.actorId,
+        caseId: caseRecord.id,
+        caseRef: caseRecord.caseRef,
+        action: 'PAYOUT_EVIDENCE_CHAINED',
+        metadata: {
+          payoutId: payout.id,
+          artifactId: artifact.id,
+          evidenceKey: payout.evidenceKey,
+          sha256: (persistedEvidence as any)?.sha256 ?? null
+        }
+      });
+    }
+
+    await this.auditService.logAction({
+      tenantId: params.tenantId,
+      actorId: params.actorId,
+      caseId: caseRecord.id,
+      caseRef: caseRecord.caseRef,
+      action: 'PAYOUT_EVIDENCE_UPLOADED',
+      metadata: {
+        artifactId: artifact.id,
+        evidenceKey,
+        sha256: persistedEvidence.sha256,
+        note: params.note ?? null
+      }
+    });
+
+    return { objectKey: evidenceKey, sha256: persistedEvidence.sha256, artifactId: artifact.id };
+  }
+
   async confirmPayout(params: {
     tenantId: string;
     actorId: string;
@@ -123,7 +183,7 @@ export class PayoutsService {
       ? await this.persistEvidence(evidenceKey as string, params.evidenceFile.buffer)
       : null;
 
-    const { payout, invoice } = await prisma.$transaction(async (tx) => {
+    const { payout, invoice, artifact } = await prisma.$transaction(async (tx) => {
       const payoutRecord = await tx.payout.create({
         data: {
           tenantId: params.tenantId,
@@ -148,6 +208,19 @@ export class PayoutsService {
         },
         include: payoutWithCaseArgs.include
       });
+
+      const artifactRecord = persistedEvidence
+        ? await tx.artifact.create({
+            data: {
+              tenantId: params.tenantId,
+              caseId: caseRecord.id,
+              caseRef: caseRecord.caseRef,
+              objectKey: evidenceKey as string,
+              sha256: persistedEvidence.sha256,
+              source: 'payout_confirmation'
+            }
+          })
+        : null;
 
       const invoiceRecord = await tx.invoice.create({
         data: {
@@ -186,7 +259,7 @@ export class PayoutsService {
         }
       });
 
-      return { payout: payoutRecord, invoice: invoiceRecord };
+      return { payout: payoutRecord, invoice: invoiceRecord, artifact: artifactRecord };
     });
 
     await this.auditService.logAction({
@@ -240,7 +313,8 @@ export class PayoutsService {
       status: updatedStatus,
       evidence: {
         objectKey: evidenceKey,
-        sha256: persistedEvidence?.sha256 ?? null
+        sha256: persistedEvidence?.sha256 ?? null,
+        artifactId: artifact?.id ?? null
       }
     };
   }

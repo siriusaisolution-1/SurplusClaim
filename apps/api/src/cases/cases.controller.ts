@@ -96,6 +96,8 @@ export class CasesController {
       metadata: { viewerRole: user.role }
     });
 
+    const auditStatus = await this.auditService.verifyChain(user.tenantId, { caseRef });
+
     return {
       case: {
         id: details.caseRecord.id,
@@ -124,9 +126,40 @@ export class CasesController {
       timeline: details.events,
       auditTrail: details.auditTrail,
       allowedTransitions: details.allowedTransitions,
+      locks: details.locks,
+      auditStatus,
       reminderHistory: details.reminderHistory,
       nextDeadline: details.nextDeadline
     };
+  }
+
+  @Get(':caseRef/locks')
+  @Roles('TENANT_ADMIN', 'REVIEWER', 'OPS', 'READ_ONLY')
+  async getLocks(@Param('caseRef') caseRef: string, @CurrentUser() user: any) {
+    const details = await this.casesService.getCaseWithTimeline(user.tenantId, caseRef);
+
+    if (!details) {
+      throw new NotFoundException('Case not found');
+    }
+
+    return { locks: details.locks };
+  }
+
+  @Get(':caseRef/audit/status')
+  @Roles('TENANT_ADMIN', 'OPS', 'READ_ONLY')
+  async auditStatus(@Param('caseRef') caseRef: string, @CurrentUser() user: any) {
+    const verification = await this.auditService.verifyChain(user.tenantId, { caseRef });
+    return verification;
+  }
+
+  @Post(':caseRef/attorney')
+  @Roles('TENANT_ADMIN', 'OPS')
+  async assignAttorney(
+    @Param('caseRef') caseRef: string,
+    @Body('attorneyId') attorneyId: string | null,
+    @CurrentUser() user: any
+  ) {
+    return this.casesService.assignAttorney(user.tenantId, user.sub, caseRef, attorneyId);
   }
 
   @Post(':caseRef/transition')

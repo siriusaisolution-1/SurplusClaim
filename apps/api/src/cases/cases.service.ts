@@ -39,6 +39,8 @@ export type CaseTransitionInput = {
   closureConfirmationRequired?: boolean;
 };
 
+type CaseLock = { code: 'PAYOUT_OVERDUE' | 'UNCONFIRMED_PAYOUT'; message: string };
+
 type TriagedTier = 'TIER_A' | 'TIER_B' | 'TIER_C';
 
 export type TriageSuggestInput = {
@@ -120,6 +122,52 @@ export class CasesService {
 
   getAllowedTransitions(status: CaseStatus): CaseStatus[] {
     return allowedTransitions[status] ?? [];
+  }
+
+  private parseExpectedPayoutDate(window?: string | null) {
+    if (!window) return null;
+    const parsed = new Date(window);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed;
+  }
+
+  private async getPayoutState(tenantId: string, caseRecordId: string) {
+    const latest = await prisma.payout.findFirst({
+      where: { tenantId, caseId: caseRecordId },
+      orderBy: [{ processedAt: 'desc' }, { createdAt: 'desc' }]
+    });
+
+    const unconfirmed = await prisma.payout.count({
+      where: { tenantId, caseId: caseRecordId, status: { not: 'CONFIRMED' } }
+    });
+
+    return { latest, hasUnconfirmed: unconfirmed > 0, hasConfirmed: latest?.status === 'CONFIRMED' };
+  }
+
+  private buildLocks(caseRecord: any, payoutState: Awaited<ReturnType<typeof this.getPayoutState>>): CaseLock[] {
+    const locks: CaseLock[] = [];
+    const expectedDate = this.parseExpectedPayoutDate(caseRecord.expectedPayoutWindow);
+
+    if (expectedDate && expectedDate.getTime() < Date.now() && !payoutState.hasConfirmed) {
+      locks.push({
+        code: 'PAYOUT_OVERDUE',
+        message: 'Expected payout window has elapsed without confirmation'
+      });
+    }
+
+    if (payoutState.hasUnconfirmed) {
+      locks.push({
+        code: 'UNCONFIRMED_PAYOUT',
+        message: 'Unconfirmed payout exists and must be resolved before closure'
+      });
+    }
+
+    return locks;
+  }
+
+  async getCaseLocks(tenantId: string, caseRecord: any): Promise<CaseLock[]> {
+    const payoutState = await this.getPayoutState(tenantId, caseRecord.id);
+    return this.buildLocks(caseRecord, payoutState);
   }
 
   private extractProceduralDeadlines(metadata: Record<string, unknown> | null) {
@@ -536,6 +584,19 @@ export class CasesService {
     const effectiveAssignedAttorneyId =
       input.assignedAttorneyId !== undefined ? input.assignedAttorneyId : caseRecord.assignedAttorneyId;
 
+    const payoutState = await this.getPayoutState(tenantId, caseRecord.id);
+    const locks = this.buildLocks(caseRecord, payoutState);
+    const lockBypassStates = [
+      CaseStatus.PAYOUT_CONFIRMED,
+      CaseStatus.CLOSED,
+      CaseStatus.ON_HOLD,
+      CaseStatus.ESCALATED
+    ];
+
+    if (locks.length > 0 && !lockBypassStates.includes(input.toState)) {
+      throw new BadRequestException(`Case locked: ${locks[0].message}`);
+    }
+
     if (
       [CaseStatus.DOCUMENT_COLLECTION, CaseStatus.PACKAGE_READY].includes(input.toState) &&
       !(await prisma.consent.findFirst({
@@ -551,6 +612,33 @@ export class CasesService {
       !effectiveAssignedAttorneyId
     ) {
       throw new BadRequestException('Attorney assignment required before payout confirmation or closure');
+    }
+
+    if (input.toState === CaseStatus.CLOSED) {
+      if (locks.some((lock) => lock.code === 'UNCONFIRMED_PAYOUT')) {
+        throw new BadRequestException('Cannot close case while payout is still unconfirmed');
+      }
+
+      const latestPayout = payoutState.latest;
+      const payoutMetadata = (latestPayout?.metadata ?? {}) as Record<string, unknown>;
+      const attorneyFee = payoutMetadata?.attorneyFeeCents as number | null;
+      const evidenceSha = payoutMetadata?.evidenceSha256 as string | null;
+
+      if (!latestPayout || latestPayout.status !== 'CONFIRMED') {
+        throw new BadRequestException('Payout confirmation required before closure');
+      }
+      if (!latestPayout.amountCents || latestPayout.amountCents <= 0) {
+        throw new BadRequestException('Payout amount must be recorded before closure');
+      }
+      if (!latestPayout.feeCents || attorneyFee === null || attorneyFee === undefined) {
+        throw new BadRequestException('Attorney fee and platform fee must be recorded before closure');
+      }
+      if (!latestPayout.evidenceKey || !evidenceSha) {
+        throw new BadRequestException('Trust confirmation artifact required before closure');
+      }
+      if (!effectiveLegalExecutionMode) {
+        throw new BadRequestException('Legal execution metadata must be set before closure');
+      }
     }
 
     const updatedCase = await prisma.$transaction(async (tx) => {
@@ -606,7 +694,8 @@ export class CasesService {
 
     return {
       ...updatedCase,
-      allowedTransitions: this.getAllowedTransitions(updatedCase.status)
+      allowedTransitions: this.getAllowedTransitions(updatedCase.status),
+      locks: await this.getCaseLocks(tenantId, updatedCase)
     };
   }
 
@@ -634,6 +723,7 @@ export class CasesService {
       events,
       auditTrail,
       allowedTransitions: this.getAllowedTransitions(caseRecord.status),
+      locks: await this.getCaseLocks(tenantId, caseRecord),
       reminderHistory: events
         .filter((event) =>
           ['DEADLINE_REMINDER_SCHEDULED', 'DEADLINE_REMINDER_SENT'].includes(event.type)
@@ -641,5 +731,39 @@ export class CasesService {
         .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()),
       nextDeadline: this.pickNextDeadline(this.extractProceduralDeadlines(caseRecord.metadata as any))
     };
+  }
+
+  async assignAttorney(tenantId: string, actorId: string, caseRef: string, attorneyId: string | null) {
+    const caseRecord = await this.findByCaseRef(tenantId, caseRef);
+
+    if (!caseRecord) {
+      throw new NotFoundException('Case not found');
+    }
+
+    const updatedCase = await prisma.case.update({
+      where: { id: caseRecord.id },
+      data: { assignedAttorneyId: attorneyId }
+    });
+
+    await prisma.caseEvent.create({
+      data: {
+        tenantId,
+        caseId: caseRecord.id,
+        caseRef: caseRecord.caseRef,
+        type: 'ATTORNEY_ASSIGNED',
+        payload: { from: caseRecord.assignedAttorneyId ?? null, to: attorneyId }
+      }
+    });
+
+    await this.auditService.logAction({
+      tenantId,
+      actorId,
+      caseId: caseRecord.id,
+      caseRef: caseRecord.caseRef,
+      action: 'ATTORNEY_ASSIGNED',
+      metadata: { attorneyId }
+    });
+
+    return { ...updatedCase, locks: await this.getCaseLocks(tenantId, updatedCase) };
   }
 }

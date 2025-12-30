@@ -85,6 +85,8 @@ interface CaseDetailResponse {
   nextDeadline: CaseDeadline | null;
   auditTrail: AuditLogEntrySnippet[];
   allowedTransitions: CaseStatus[];
+  locks?: { code: string; message: string }[];
+  auditStatus?: { isValid: boolean; checked: number; brokenRecord?: unknown };
 }
 
 interface JurisdictionSummary {
@@ -995,6 +997,20 @@ export default function CasesPage() {
                     <p style={{ color: '#9ca3af', margin: 0 }}>
                       Reviewer: {selectedCase.case.reviewer?.email ?? 'Unassigned'}
                     </p>
+                    {selectedCase.locks && selectedCase.locks.length > 0 && (
+                      <div style={{ marginTop: '0.5rem', color: '#f59e0b' }}>
+                        {selectedCase.locks.map((lock) => (
+                          <div key={lock.code} className="tag" style={{ background: '#312e81' }}>
+                            {lock.code}: {lock.message}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {selectedCase.auditStatus && selectedCase.auditStatus.isValid === false && (
+                      <div style={{ marginTop: '0.5rem', color: '#f87171' }}>
+                        Audit chain broken after {selectedCase.auditStatus.checked} entries.
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Transition</label>
