@@ -14,6 +14,24 @@ export class PayoutsController {
     return this.payoutsService.listForCase(user.tenantId, caseRef);
   }
 
+  @Post('evidence')
+  @Roles('TENANT_ADMIN', 'REVIEWER', 'OPS', 'B2B_CLIENT')
+  @UseInterceptors(FileInterceptor('evidence'))
+  async uploadEvidence(
+    @Param('caseRef') caseRef: string,
+    @UploadedFile() evidence: Express.Multer.File,
+    @Body() body: any,
+    @CurrentUser() user: any
+  ) {
+    return this.payoutsService.uploadEvidence({
+      tenantId: user.tenantId,
+      actorId: user.sub,
+      caseRef,
+      evidenceFile: evidence,
+      note: body.note ?? undefined
+    });
+  }
+
   @Post('confirm')
   @Roles('TENANT_ADMIN', 'REVIEWER', 'OPS', 'B2B_CLIENT')
   @UseInterceptors(FileInterceptor('evidence'))

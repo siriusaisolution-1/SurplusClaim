@@ -26,7 +26,7 @@ export class CasesController {
     @Query('pageSize') pageSize?: string
   ) {
     const parsedStatus = status && Object.values(CaseStatus).includes(status) ? status : undefined;
-    const response = await this.casesService.listCases(user.tenantId, {
+    const response: any = await this.casesService.listCases(user.tenantId, {
       status: parsedStatus,
       search,
       needsTriage: needsTriage === 'true',
@@ -74,7 +74,7 @@ export class CasesController {
   @Get(':caseRef')
   @Roles('TENANT_ADMIN', 'REVIEWER', 'OPS', 'READ_ONLY')
   async getCase(@Param('caseRef') caseRef: string, @CurrentUser() user: any) {
-    const details = await this.casesService.getCaseWithTimeline(user.tenantId, caseRef);
+    const details: any = await this.casesService.getCaseWithTimeline(user.tenantId, caseRef);
 
     if (!details) {
       await this.auditService.logAction({
@@ -95,6 +95,8 @@ export class CasesController {
       action: 'CASE_VIEWED',
       metadata: { viewerRole: user.role }
     });
+
+    const auditStatus = await this.auditService.verifyChain(user.tenantId, { caseRef });
 
     return {
       case: {
@@ -124,9 +126,40 @@ export class CasesController {
       timeline: details.events,
       auditTrail: details.auditTrail,
       allowedTransitions: details.allowedTransitions,
+      locks: details.locks,
+      auditStatus,
       reminderHistory: details.reminderHistory,
       nextDeadline: details.nextDeadline
     };
+  }
+
+  @Get(':caseRef/locks')
+  @Roles('TENANT_ADMIN', 'REVIEWER', 'OPS', 'READ_ONLY')
+  async getLocks(@Param('caseRef') caseRef: string, @CurrentUser() user: any) {
+    const details = await this.casesService.getCaseWithTimeline(user.tenantId, caseRef);
+
+    if (!details) {
+      throw new NotFoundException('Case not found');
+    }
+
+    return { locks: details.locks };
+  }
+
+  @Get(':caseRef/audit/status')
+  @Roles('TENANT_ADMIN', 'OPS', 'READ_ONLY')
+  async auditStatus(@Param('caseRef') caseRef: string, @CurrentUser() user: any) {
+    const verification = await this.auditService.verifyChain(user.tenantId, { caseRef });
+    return verification;
+  }
+
+  @Post(':caseRef/attorney')
+  @Roles('TENANT_ADMIN', 'OPS')
+  async assignAttorney(
+    @Param('caseRef') caseRef: string,
+    @Body('attorneyId') attorneyId: string | null,
+    @CurrentUser() user: any
+  ) {
+    return this.casesService.assignAttorney(user.tenantId, user.sub, caseRef, attorneyId);
   }
 
   @Post(':caseRef/transition')

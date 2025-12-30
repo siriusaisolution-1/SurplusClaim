@@ -85,6 +85,25 @@ async function main() {
     }
   });
 
+  await prisma.payout.create({
+    data: {
+      tenantId: tenant.id,
+      caseId: closureBlocked.id,
+      caseRef: closureBlocked.caseRef,
+      amountCents: 7500,
+      currency: 'USD',
+      status: 'CONFIRMED',
+      reference: 'ready-to-close',
+      processedAt: new Date(),
+      confirmedAt: new Date(),
+      confirmedBy: actor.id,
+      evidenceKey: 'closure-artifact',
+      feeCents: 1500,
+      feeRateBps: 1000,
+      metadata: { attorneyFeeCents: 3000, evidenceSha256: 'closure-hash' }
+    }
+  });
+
   await assert.rejects(
     () =>
       casesService.transitionCase(tenant.id, actor.id, closureBlocked.caseRef, {
@@ -103,6 +122,89 @@ async function main() {
   });
 
   assert.strictEqual(closed.status, CaseStatus.CLOSED);
+
+  const overdueCase = await prisma.case.create({
+    data: {
+      tenantId: tenant.id,
+      caseRef: 'CASE-GUARD-OVERDUE',
+      status: CaseStatus.SUBMITTED,
+      tierSuggested: TierLevel.MEDIUM,
+      expectedPayoutWindow: '2020-01-01T00:00:00.000Z'
+    }
+  });
+
+  await assert.rejects(
+    () =>
+      casesService.transitionCase(tenant.id, actor.id, overdueCase.caseRef, {
+        toState: CaseStatus.DOCUMENT_COLLECTION
+      }),
+    (error) => error instanceof BadRequestException
+  );
+
+  const pendingPayoutCase = await prisma.case.create({
+    data: {
+      tenantId: tenant.id,
+      caseRef: 'CASE-GUARD-PENDING',
+      status: CaseStatus.PAYOUT_CONFIRMED,
+      tierSuggested: TierLevel.MEDIUM,
+      assignedAttorneyId: attorney.id
+    }
+  });
+
+  await prisma.payout.create({
+    data: {
+      tenantId: tenant.id,
+      caseId: pendingPayoutCase.id,
+      caseRef: pendingPayoutCase.caseRef,
+      amountCents: 5000,
+      currency: 'USD',
+      status: 'PENDING',
+      reference: 'pending-payout'
+    }
+  });
+
+  await assert.rejects(
+    () =>
+      casesService.transitionCase(tenant.id, actor.id, pendingPayoutCase.caseRef, {
+        toState: CaseStatus.CLOSED
+      }),
+    (error) => error instanceof BadRequestException
+  );
+
+  const readyForClose = await prisma.case.create({
+    data: {
+      tenantId: tenant.id,
+      caseRef: 'CASE-GUARD-READY',
+      status: CaseStatus.PAYOUT_CONFIRMED,
+      tierSuggested: TierLevel.MEDIUM,
+      assignedAttorneyId: attorney.id
+    }
+  });
+
+  await prisma.payout.create({
+    data: {
+      tenantId: tenant.id,
+      caseId: readyForClose.id,
+      caseRef: readyForClose.caseRef,
+      amountCents: 10000,
+      currency: 'USD',
+      status: 'CONFIRMED',
+      reference: 'paid',
+      processedAt: new Date(),
+      confirmedAt: new Date(),
+      confirmedBy: actor.id,
+      evidenceKey: 'object-key',
+      feeCents: 1000,
+      feeRateBps: 1000,
+      metadata: { attorneyFeeCents: 5000, evidenceSha256: 'abc123' }
+    }
+  });
+
+  const finalClosed = await casesService.transitionCase(tenant.id, actor.id, readyForClose.caseRef, {
+    toState: CaseStatus.CLOSED
+  });
+
+  assert.strictEqual(finalClosed.status, CaseStatus.CLOSED);
 
   console.log('Case transition guard tests passed');
 }
