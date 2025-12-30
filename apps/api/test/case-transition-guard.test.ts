@@ -8,12 +8,7 @@ import { CasesService } from '../src/cases/cases.service';
 import { prisma } from '../src/prisma/prisma.client';
 
 async function setup() {
-  await prisma.auditLog.deleteMany({});
-  await prisma.caseEvent.deleteMany({});
-  await prisma.case.deleteMany({});
-  await prisma.attorney.deleteMany({});
-  await prisma.user.deleteMany({});
-  await prisma.tenant.deleteMany({});
+  await prisma.$executeRawUnsafe('TRUNCATE TABLE "Tenant" CASCADE;');
 
   const tenant = await prisma.tenant.create({ data: { name: 'Attorney Guard Tenant' } });
 
