@@ -1,0 +1,189 @@
+BUSINESS MODEL & SYSTEM SPECIFICATION v2.0
+
+AI-Assisted Tax Surplus / Excess Proceeds Recovery Platform (USA)
+
+0. EXECUTIVE SUMMARY (UPDATED – IT / ARCHITECT GPT)
+
+Ovo je high-compliance, audit-first, attorney-executed platforma koja asistira u recovery-ju tax surplus / excess proceeds sredstava u SAD.
+
+Ključna korekcija u v2.0
+Platforma nikada ne funkcioniše bez advokatskog izvršnog sloja.
+Sav payout i monetizacija se dešavaju isključivo kroz attorney-managed flow.
+
+Platforma ostaje:
+    • UPL-safe by design
+    • Human-in-the-loop
+    • AI-assisted, nikad AI-deciding
+
+1. SYSTEM GOALS & NON-GOALS (REVIDIRANO)
+
+1.1 Ciljevi sistema (hard)
+
+✔ Identifikacija potencijalnih CA surplus slučajeva
+✔ Operativna klasifikacija (Tier A/B/C)
+✔ Claim package priprema (non-legal)
+✔ Legal execution routing ka advokatu
+✔ Monetizacija isključivo kroz attorney fee realization
+✔ Potpuna auditabilnost (case + fee)
+
+1.2 Non-Goals (prošireno)
+
+❌ Platforma nikada:
+    • ne prima sredstva
+    • ne kontroliše trust account
+    • ne isplaćuje fee direktno od vlasnika
+    • ne zatvara slučaj bez attorney confirmation
+
+2. DUAL OPERATING MODES (NOVO – KLJUČNA IZMENU)
+
+2.1 Mode A – Platform-Led (Phase 1 default)
+
+Flow
+Platforma:
+    • discovery
+    • triage
+    • client consent
+    • claim package
+
+Advokat:
+    • filing
+    • trust account
+    • payout
+    • fee realization
+
+Hard rule
+
+No Attorney Assigned → No Payout Phase
+
+Svaki case mora imati:
+    • AttorneyExecutionPath = REQUIRED
+
+2.2 Mode B – Attorney-Led SaaS
+
+Advokat:
+    • koristi platformu kao:
+        ◦ discovery engine
+        ◦ case management
+        ◦ compliance-safe ops layer
+
+Platforma:
+    • nema direktan B2C odnos
+    • monetizuje isključivo B2B
+
+3. JURISDICTION SCOPE (UPDATED)
+
+Phase 1 (MVP)
+    • State: California ONLY
+    • Counties: konfigurisani (≤10 u startu)
+    • Tier A + deo Tier B
+    • Bez automatizovanog filing-a
+
+Phase 2
+    • Multi-state expansion
+    • Optional fix fee za high-volume firms
+
+Phase 3
+    • Federal coverage
+    • Mandatory fix + reduced fee
+
+4. CORE MODULE UPDATES (SAMO IZMENJENO)
+
+4.1 Case Management – Legal Execution Extension
+
+Novi obavezni atributi case-a:
+{
+  "legal_execution_mode": "ATTORNEY_PARTNER | ATTORNEY_CLIENT_OWNED",
+  "assigned_attorney_id": "...",
+  "expected_payout_window": "...",
+  "closure_confirmation_required": true
+}
+Bez ova 3 polja → case ne može preći u PAYOUT_CONFIRMED.
+
+4.2 Payout & Billing Engine (REVIDIRANO)
+
+Phase 1 Pricing Rule (California)
+    • Platform fee = 12%
+    • Osnovica = realizovani attorney fee
+    • Fix fee = 0
+PlatformFee = AttorneyFee * 0.12
+Trigger:
+    • Attorney payout confirmation
+    • Trust disbursement summary upload
+
+5. FEE CONTROL & LOCK-IN MECHANISMS (NOVO)
+
+5.1 Case Origination Lock (Contract + System)
+
+Case koji je:
+    • discovered
+    • triaged
+    • prepared
+
+na platformi → mora biti zatvoren na platformi.
+
+5.2 Progressive Feature Lock
+
+Ako postoji:
+    • neconfirmiran payout
+    • overdue case (beyond expected window)
+
+→ advokat gubi:
+    • discovery feed
+    • batch ops
+    • new case intake
+
+5.3 Closure Enforcement
+
+Bez:
+    • payout amount
+    • attorney fee
+    • trust confirmation
+
+→ case status = BLOCKED
+
+6. CUSTOMER SEGMENTS (UPDATED)
+
+Primary (Phase 1)
+    • Licensed California attorneys / law firms
+
+Secondary
+    • Bivši vlasnici (isključivo kroz attorney rail)
+
+7. TECH STACK (UNCHANGED)
+
+(ostaje identično kao u v1 – nema potrebe za izmenama)
+
+8. EXECUTION PLAN (UPDATED)
+
+Phase 0 – Legal Hardening (CA-only)
+    • California surplus rules
+    • Attorney agreement (Phase 1)
+    • Fee cap validation
+
+Phase 1 – Platform Core
+    • Case lifecycle
+    • Attorney routing
+    • Fee ledger
+
+Phase 2 – AI Assist
+    • Parsing
+    • Tier suggestions
+    • Missing doc detection
+
+9. SUCCESS METRICS (REVIDIRANO)
+    • Realized attorney fee
+    • Platform fee collected
+    • Case leakage rate = 0
+    • Off-platform closure attempts = 0
+    • Regulatory incidents = 0
+
+10. STRATEGIC CONCLUSION (IMPORTANT)
+
+Ova v2.0 verzija:
+
+✔ ne menja DNK platforme
+✔ rešava naplatu
+✔ rešava scale
+✔ rešava UPL rizik
+✔ uvodi jasan upgrade path (fix fee kasnije)
+
