@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common';
-import { CaseStatus, TierLevel } from '@prisma/client';
+import { CaseStatus, LegalExecutionMode, TierLevel } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { prisma } from '../prisma/prisma.client';
@@ -15,6 +15,10 @@ export type CreateCaseInput = {
   caseRef: string;
   tierSuggested?: TierLevel;
   assignedReviewerId?: string | null;
+  assignedAttorneyId?: string | null;
+  legalExecutionMode?: LegalExecutionMode;
+  expectedPayoutWindow?: string | null;
+  closureConfirmationRequired?: boolean;
   metadata?: Record<string, unknown>;
 };
 
@@ -29,6 +33,10 @@ export type ListCasesParams = {
 export type CaseTransitionInput = {
   toState: CaseStatus;
   reason?: string;
+  assignedAttorneyId?: string | null;
+  legalExecutionMode?: LegalExecutionMode;
+  expectedPayoutWindow?: string | null;
+  closureConfirmationRequired?: boolean;
 };
 
 type TriagedTier = 'TIER_A' | 'TIER_B' | 'TIER_C';
@@ -200,7 +208,7 @@ export class CasesService {
   async findByCaseRef(tenantId: string, caseRef: string) {
     return prisma.case.findFirst({
       where: { tenantId, caseRef },
-      include: { assignedReviewer: true }
+      include: { assignedReviewer: true, assignedAttorney: true }
     });
   }
 
@@ -221,7 +229,7 @@ export class CasesService {
       prisma.case.count({ where }),
       prisma.case.findMany({
         where,
-        include: { assignedReviewer: true },
+        include: { assignedReviewer: true, assignedAttorney: true },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize
@@ -247,6 +255,10 @@ export class CasesService {
           status: CaseStatus.DISCOVERED,
           tierSuggested,
           assignedReviewerId: input.assignedReviewerId ?? null,
+          assignedAttorneyId: input.assignedAttorneyId ?? null,
+          legalExecutionMode: input.legalExecutionMode ?? LegalExecutionMode.ATTORNEY_REQUIRED,
+          expectedPayoutWindow: input.expectedPayoutWindow ?? null,
+          closureConfirmationRequired: input.closureConfirmationRequired ?? false,
           metadata: input.metadata ?? null
         }
       });
@@ -260,6 +272,10 @@ export class CasesService {
           payload: {
             tierSuggested,
             assignedReviewerId: input.assignedReviewerId ?? null,
+            assignedAttorneyId: input.assignedAttorneyId ?? null,
+            legalExecutionMode: input.legalExecutionMode ?? LegalExecutionMode.ATTORNEY_REQUIRED,
+            expectedPayoutWindow: input.expectedPayoutWindow ?? null,
+            closureConfirmationRequired: input.closureConfirmationRequired ?? false,
             metadata: input.metadata ?? {}
           }
         }
@@ -276,7 +292,11 @@ export class CasesService {
       action: 'CASE_CREATED',
       metadata: {
         tierSuggested,
-        assignedReviewerId: input.assignedReviewerId ?? null
+        assignedReviewerId: input.assignedReviewerId ?? null,
+        assignedAttorneyId: input.assignedAttorneyId ?? null,
+        legalExecutionMode: input.legalExecutionMode ?? LegalExecutionMode.ATTORNEY_REQUIRED,
+        expectedPayoutWindow: input.expectedPayoutWindow ?? null,
+        closureConfirmationRequired: input.closureConfirmationRequired ?? false
       }
     });
 
@@ -508,6 +528,14 @@ export class CasesService {
       );
     }
 
+    if (input.legalExecutionMode && !Object.values(LegalExecutionMode).includes(input.legalExecutionMode)) {
+      throw new BadRequestException('Invalid legalExecutionMode value');
+    }
+
+    const effectiveLegalExecutionMode = input.legalExecutionMode ?? caseRecord.legalExecutionMode;
+    const effectiveAssignedAttorneyId =
+      input.assignedAttorneyId !== undefined ? input.assignedAttorneyId : caseRecord.assignedAttorneyId;
+
     if (
       [CaseStatus.DOCUMENT_COLLECTION, CaseStatus.PACKAGE_READY].includes(input.toState) &&
       !(await prisma.consent.findFirst({
@@ -517,10 +545,33 @@ export class CasesService {
       throw new BadRequestException('Cannot proceed without a signed consent on file');
     }
 
+    if (
+      [CaseStatus.PAYOUT_CONFIRMED, CaseStatus.CLOSED].includes(input.toState) &&
+      effectiveLegalExecutionMode === LegalExecutionMode.ATTORNEY_REQUIRED &&
+      !effectiveAssignedAttorneyId
+    ) {
+      throw new BadRequestException('Attorney assignment required before payout confirmation or closure');
+    }
+
     const updatedCase = await prisma.$transaction(async (tx) => {
+      const data: any = { status: input.toState };
+
+      if (input.assignedAttorneyId !== undefined) {
+        data.assignedAttorneyId = input.assignedAttorneyId;
+      }
+      if (input.legalExecutionMode) {
+        data.legalExecutionMode = input.legalExecutionMode;
+      }
+      if (input.expectedPayoutWindow !== undefined) {
+        data.expectedPayoutWindow = input.expectedPayoutWindow;
+      }
+      if (input.closureConfirmationRequired !== undefined) {
+        data.closureConfirmationRequired = input.closureConfirmationRequired;
+      }
+
       const record = await tx.case.update({
         where: { id: caseRecord.id },
-        data: { status: input.toState }
+        data
       });
 
       await tx.caseEvent.create({
