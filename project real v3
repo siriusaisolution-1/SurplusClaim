@@ -1,0 +1,290 @@
+PROMPT P1 — CI Baseline Stabilization
+Goal: Establish a deterministic, stable CI baseline that doesn’t depend on local state.
+
+Context:
+- Monorepo uses pnpm workspaces.
+- CI runs lint, typecheck, tests, build.
+- Postgres service is available in CI.
+
+Tasks:
+1) Update .github/workflows/ci.yml to:
+   - Use Node 20
+   - Use corepack and pinned pnpm version
+   - Install dependencies with pnpm
+   - Run lint, prisma generate (where needed), typecheck, tests, build in a predictable order
+   - Ensure postgres healthcheck and DATABASE_URL are correct
+2) Ensure Prisma steps are run with correct working directory and schema path.
+3) Make CI work for both PR and push.
+
+Acceptance:
+- GitHub Actions "build-and-verify" passes on PR and main pushes.
+- Commands: pnpm lint, pnpm exec tsc -p apps/*/tsconfig.json --noEmit, pnpm test, pnpm -r --filter "./apps/**" build all succeed in CI.
+
+Output:
+- Provide full updated .github/workflows/ci.yml (complete file).
+
+PROMPT P2 — Prisma & DB Strategy for CI (Migrations vs db push)
+Goal: Make database setup in CI deterministic and aligned with workflow needs.
+
+Tasks:
+1) Decide whether CI should use:
+   A) prisma migrate deploy (requires migrations committed), or
+   B) prisma db push --accept-data-loss (ephemeral CI DB).
+2) Implement the chosen approach consistently in:
+   - apps/api package scripts
+   - CI workflow
+   - tests that currently run migrations themselves
+3) Ensure tests do not double-run conflicting schema operations.
+
+Acceptance:
+- CI runs tests without schema mismatch errors.
+- Prisma client generation + schema application happens exactly once per CI run per app.
+
+Output:
+- Full updated .github/workflows/ci.yml (complete file) if changed.
+- Full updated apps/api/package.json (complete file) if changed.
+- Any new/updated prisma scripts included.
+
+PROMPT P3 — Fix Prisma Client Exports / Enum Usage
+Goal: Ensure @prisma/client exports enums and types used by the API.
+
+Problem:
+- Errors like: Module "@prisma/client" has no exported member 'CaseStatus', 'TierLevel', 'FeeAgreement'.
+
+Tasks:
+1) Verify apps/api/prisma/schema.prisma declares enums and models correctly.
+2) Ensure prisma generate runs in the right place and outputs a client that includes the enums.
+3) Update API imports (if needed) to use correct Prisma exports pattern.
+
+Acceptance:
+- pnpm exec tsc -p apps/api/tsconfig.json --noEmit passes.
+- Prisma client generation works in CI and locally.
+
+Output:
+- Full updated files that changed (schema, API imports, scripts).
+
+PROMPT P4 — Replace/Remove Harmful TypeScript Shims (Make TS Real)
+Goal: Remove or minimize broad shims that break type-safety and CI.
+
+Context:
+- apps/api/types/shims.d.ts currently declares many modules as any and even overrides @nestjs/common types.
+
+Tasks:
+1) Stop overriding real external packages (@nestjs/common, express, multer, pdfkit, @prisma/client) in shims.
+2) Keep ONLY minimal shims for internal workspace packages if needed (@surplus/*) and give them correct shapes.
+3) Fix tsconfig paths so workspace packages resolve normally (prefer real TS project refs or proper package.json types).
+
+Acceptance:
+- No more TS errors like "INestApplication not exported" due to fake shims.
+- pnpm exec tsc -p apps/api/tsconfig.json --noEmit passes without relying on broad 'any' shims.
+
+Output:
+- Full updated apps/api/types/shims.d.ts
+- Full updated apps/api/tsconfig.json (and any new tsconfig.test.json if used)
+
+PROMPT P5 — Fix NestJS Rate Limit Guard (429 Exception)
+Goal: Make rate limiting compile and behave correctly with current NestJS version.
+
+Problem:
+- TooManyRequestsException is not exported by current @nestjs/common in this repo.
+
+Tasks:
+1) Update apps/api/src/auth/rate-limit.guard.ts:
+   - Replace TooManyRequestsException with a supported approach:
+     - Either HttpException(HttpStatus.TOO_MANY_REQUESTS)
+     - Or integrate @nestjs/throttler and use ThrottlerException
+2) Ensure the guard still returns 429 and message body is reasonable.
+
+Acceptance:
+- Typecheck passes.
+- Guard throws 429 correctly.
+
+Output:
+- Full updated apps/api/src/auth/rate-limit.guard.ts
+- Any dependency/package changes (full package.json if changed)
+
+PROMPT P6 — Fix pdfkit Typings Cleanly
+Goal: Remove TypeScript error TS7016 for 'pdfkit'.
+
+Tasks:
+1) Add proper typings:
+   - Install @types/pdfkit if appropriate, OR
+   - Add a local declaration file for pdfkit without breaking other types.
+2) Ensure it works in CI and does not rely on wildcard module shims.
+
+Acceptance:
+- TS7016 disappears.
+- Build/typecheck passes.
+
+Output:
+- Full updated apps/api/package.json if dependencies changed
+- Full new declaration file if added (show full file)
+
+PROMPT P7 — Fix Consent Service Type Errors (CaseStatus narrowing, params any)
+Goal: Make apps/api/src/consent/consent.service.ts typecheck cleanly.
+
+Problems seen:
+- CaseStatus assignment errors (union mismatch)
+- implicit any in parameters
+
+Tasks:
+1) Align consent lifecycle transitions with CaseStatus enum.
+2) Fix any implicit any parameters by typing them.
+3) Ensure code uses Prisma types correctly.
+
+Acceptance:
+- pnpm exec tsc -p apps/api/tsconfig.json --noEmit passes.
+
+Output:
+- Full updated apps/api/src/consent/consent.service.ts
+
+PROMPT P8 — Fix Documents Controller Multer Type Mismatch
+Goal: Resolve TS2322 in documents controller related to multer fileFilter callback signature.
+
+Tasks:
+1) Update apps/api/src/documents/documents.controller.ts to match correct multer types.
+2) If needed, import correct multer types and adjust callback signature.
+3) Avoid declaring express/multer as any in shims.
+
+Acceptance:
+- Typecheck passes.
+
+Output:
+- Full updated apps/api/src/documents/documents.controller.ts
+- Any typing/dependency file updates if needed (full files)
+
+PROMPT P9 — Fix Payouts Service Type Errors (“case” property missing)
+Goal: Resolve TS2339 around missing 'case' property and other payout typing issues.
+
+Tasks:
+1) Inspect apps/api/src/payouts/payouts.service.ts and any DTOs.
+2) Ensure Prisma queries include relations when code expects them (e.g., include: { case: true }).
+3) Tighten types so the returned object matches usage.
+
+Acceptance:
+- Typecheck passes
+- Existing tests still pass
+
+Output:
+- Full updated payouts.service.ts (and related DTOs if changed)
+
+PROMPT P10 — Fix @surplus/rules Types (CaseChecklistContext shape)
+Goal: Stop TS errors where code accesses properties on unknown CaseChecklistContext.
+
+Tasks:
+1) Find the real type in packages/rules (e.g., checklist context includes case_ref, state, county_code).
+2) Update API usage or internal type imports so TS understands shape.
+3) If a shim is still required, align it to the real shape (not unknown/any).
+
+Acceptance:
+- Typecheck passes.
+- No TS2339 for state/county_code on unknown.
+
+Output:
+- Full updated apps/api/types/shims.d.ts (if used)
+- Any updated imports in apps/api/src/rules/rules.service.ts (full file)
+
+PROMPT P11 — Fix AI_OUTPUT_RULES typing (rationaleMessages)
+Goal: Make legal safety code compile by typing AI_OUTPUT_RULES correctly.
+
+Problem:
+- AI_OUTPUT_RULES typed as string in shim but code expects it to have rationaleMessages.
+
+Tasks:
+1) Confirm actual shape in packages/shared (AI_OUTPUT_RULES should include rationaleMessages).
+2) Update API imports to use real type, or fix shim to match shape.
+3) Ensure apps/api/src/safety/legal-safety.service.ts compiles.
+
+Acceptance:
+- Typecheck passes.
+- Legal safety tests pass.
+
+Output:
+- Full updated apps/api/src/safety/legal-safety.service.ts (if changed)
+- Full updated apps/api/types/shims.d.ts (if changed)
+
+PROMPT P12 — Standardize API Test Execution (tsconfig.test.json + scripts)
+Goal: Make apps/api tests deterministic and not depend on TS compilation quirks.
+
+Tasks:
+1) Ensure apps/api/tsconfig.test.json exists and includes both src and test files.
+2) Update apps/api/package.json test script to consistently use:
+   - prisma generate
+   - db push OR migrate deploy (based on earlier decision)
+   - run test files in correct order
+3) Avoid ts-node compiling with broken shims.
+
+Acceptance:
+- pnpm --filter @surplus/api test passes locally and in CI.
+- pnpm -r test passes.
+
+Output:
+- Full updated apps/api/package.json
+- Full updated apps/api/tsconfig.test.json (if created/changed)
+
+PROMPT P13 — Implement Attorney Execution Primitives (v2.0 model alignment)
+Goal: Extend data model + API primitives to enforce “Attorney execution is required”.
+
+Tasks:
+1) Update Prisma schema to add:
+   - Attorney entity (or assigned attorney reference)
+   - legal_execution_mode
+   - assigned_attorney_id
+   - expected_payout_window
+   - closure_confirmation_required
+2) Add guards: No attorney assigned → cannot proceed to payout-confirmed / closure.
+3) Add/update tests around transitions.
+
+Acceptance:
+- Prisma generate/db setup works.
+- API transition guards enforced.
+- Tests pass.
+
+Output:
+- Full updated apps/api/prisma/schema.prisma
+- Full updated affected service/controller/DTO files
+- New migration/db push strategy consistent with CI
+
+PROMPT P14 — Implement Phase 1 California Fee Rule (12% of realized attorney fee)
+Goal: Replace current tier fee bands with Phase 1 CA rule:
+Platform fee = 12% of realized attorney fee; no fixed fee.
+
+Tasks:
+1) Update fee calculator service to compute based on attorney fee.
+2) Wire payout confirmation flow to require attorney fee input + trust disbursement evidence.
+3) Update tests (fee-calculator.test.ts) to match new rule.
+
+Acceptance:
+- Fee tests pass with the new rule.
+- Integration tests still pass.
+
+Output:
+- Full updated apps/api/src/payouts/fee-calculator.service.ts
+- Full updated apps/api/test/fee-calculator.test.ts
+- Any other touched files (full)
+
+PROMPT P15 — Closure Enforcement, Overdue Locks, Audit/Evidence Hardening, UI hooks
+Goal: Finish v2.0 alignment for closure enforcement and operational controls.
+
+Tasks:
+1) Introduce overdue tracking using expected_payout_window.
+2) Block closure without:
+   - payout amount
+   - attorney fee + platform fee computed
+   - trust confirmation artifacts uploaded
+   - legal execution metadata set
+3) Add progressive lock behavior when overdue/unconfirmed payouts exist.
+4) Harden audit: chain payout evidence hashes and attorney confirmation artifacts.
+5) Add minimal UI/API endpoints/hooks for:
+   - attorney assignment
+   - payout confirmation evidence upload
+   - lock warnings and audit status
+
+Acceptance:
+- Behavioral tests for transition blocks.
+- Audit verify passes after normal flow and fails after tamper.
+- CI passes.
+
+Output:
+- Full updated affected API files, schema changes, tests, and minimal UI endpoints if included.
+
