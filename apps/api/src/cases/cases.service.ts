@@ -286,10 +286,51 @@ export class CasesService {
   }
 
   async findByCaseRef(tenantId: string, caseRef: string) {
-    return prisma.case.findFirst({
-      where: { tenantId, caseRef },
-      include: { assignedReviewer: true, assignedAttorney: true }
-    });
+    try {
+      return await prisma.case.findFirst({
+        where: { tenantId, caseRef },
+        include: { assignedReviewer: true, assignedAttorney: true }
+      });
+    } catch (error: any) {
+      const message = error?.message ?? '';
+
+      if (message.includes('LegalExecutionMode') && message.includes('null')) {
+        const rows = await prisma.$queryRaw<
+          Array<{
+            id: string;
+            tenantId: string;
+            caseRef: string;
+            status: CaseStatus;
+            tierSuggested: TierLevel;
+            tierConfirmed: TierLevel | null;
+            assignedReviewerId: string | null;
+            assignedAttorneyId: string | null;
+            legalExecutionMode: LegalExecutionMode | null;
+            expectedPayoutWindow: string | null;
+            closureConfirmationRequired: boolean;
+            metadata: Record<string, unknown> | null;
+            createdAt: Date;
+            updatedAt: Date;
+          }>
+        >`SELECT * FROM "Case" WHERE "tenantId" = ${tenantId} AND "caseRef" = ${caseRef} LIMIT 1`;
+
+        const rawCase = rows[0];
+        if (!rawCase) return null;
+
+        const [assignedReviewer, assignedAttorney] = await Promise.all([
+          rawCase.assignedReviewerId
+            ? prisma.user.findUnique({ where: { id: rawCase.assignedReviewerId } })
+            : Promise.resolve(null),
+          rawCase.assignedAttorneyId
+            ? prisma.attorney.findUnique({ where: { id: rawCase.assignedAttorneyId } })
+            : Promise.resolve(null)
+        ]);
+
+        return { ...rawCase, assignedReviewer, assignedAttorney } as any;
+      }
+
+      throw error;
+    }
   }
 
   async listCases(tenantId: string, params: ListCasesParams) {
