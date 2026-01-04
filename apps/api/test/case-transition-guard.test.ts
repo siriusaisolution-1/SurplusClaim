@@ -62,9 +62,12 @@ async function main() {
       caseRef: 'CASE-GUARD-NO-LEGAL',
       status: CaseStatus.SUBMITTED,
       tierSuggested: TierLevel.LOW,
-      legalExecutionMode: null as any
+      legalExecutionMode: LegalExecutionMode.OPS_DIRECT
     }
   });
+  await prisma.$executeRawUnsafe(
+    `UPDATE "Case" SET "legalExecutionMode" = NULL WHERE "id" = '${caseWithoutLegalExecution.id}';`
+  );
 
   await assert.rejects(
     () =>
