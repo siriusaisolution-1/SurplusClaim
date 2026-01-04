@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException
 } from '@nestjs/common';
-import { CaseStatus, LegalExecutionMode, TierLevel } from '@prisma/client';
+import { CaseStatus, LegalExecutionMode, Prisma, TierLevel } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { prisma } from '../prisma/prisma.client';
@@ -312,7 +312,9 @@ export class CasesService {
             createdAt: Date;
             updatedAt: Date;
           }>
-        >`SELECT * FROM "Case" WHERE "tenantId" = ${tenantId} AND "caseRef" = ${caseRef} LIMIT 1`;
+        >(
+          Prisma.sql`SELECT * FROM "Case" WHERE "tenantId" = ${tenantId}::uuid AND "caseRef" = ${caseRef} LIMIT 1`
+        );
 
         const rawCase = rows[0];
         if (!rawCase) return null;
