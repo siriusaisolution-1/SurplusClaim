@@ -76,7 +76,7 @@ async function main() {
 
   await prisma.case.update({
     where: { id: caseWithoutLegalExecution.id },
-    data: { legalExecutionMode: LegalExecutionMode.SELF_SERVICE }
+    data: { legalExecutionMode: LegalExecutionMode.OPS_DIRECT }
   });
   await prisma.$executeRawUnsafe('ALTER TABLE "Case" ALTER COLUMN "legalExecutionMode" SET NOT NULL;');
 
@@ -86,7 +86,7 @@ async function main() {
       caseRef: 'CASE-GUARD-NO-EVIDENCE',
       status: CaseStatus.SUBMITTED,
       tierSuggested: TierLevel.LOW,
-      legalExecutionMode: LegalExecutionMode.SELF_SERVICE
+      legalExecutionMode: LegalExecutionMode.OPS_DIRECT
     }
   });
 
