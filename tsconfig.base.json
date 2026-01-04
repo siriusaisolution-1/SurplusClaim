@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
+    "baseUrl": ".",
     "moduleResolution": "node",
     "outDir": "dist",
     "strict": true,
@@ -12,6 +13,12 @@
     "skipLibCheck": true,
     "sourceMap": true,
     "rootDir": "src",
-    "typeRoots": ["./types", "./node_modules/@types"]
+    "typeRoots": ["./types", "./node_modules/@types"],
+    "paths": {
+      "@surplus/rules": ["packages/rules/src"],
+      "@surplus/shared": ["packages/shared/src"],
+      "@surplus/connectors": ["packages/connectors/src"],
+      "@surplus/audit": ["packages/audit/src"]
+    }
   }
 }
