@@ -55,6 +55,49 @@ async function main() {
     (error) => error instanceof BadRequestException
   );
 
+  await prisma.$executeRawUnsafe('ALTER TABLE "Case" ALTER COLUMN "legalExecutionMode" DROP NOT NULL;');
+  const caseWithoutLegalExecution = await prisma.case.create({
+    data: {
+      tenantId: tenant.id,
+      caseRef: 'CASE-GUARD-NO-LEGAL',
+      status: CaseStatus.SUBMITTED,
+      tierSuggested: TierLevel.LOW,
+      legalExecutionMode: null as any
+    }
+  });
+
+  await assert.rejects(
+    () =>
+      casesService.transitionCase(tenant.id, actor.id, caseWithoutLegalExecution.caseRef, {
+        toState: CaseStatus.PAYOUT_CONFIRMED
+      }),
+    (error) => error instanceof BadRequestException
+  );
+
+  await prisma.case.update({
+    where: { id: caseWithoutLegalExecution.id },
+    data: { legalExecutionMode: LegalExecutionMode.SELF_SERVICE }
+  });
+  await prisma.$executeRawUnsafe('ALTER TABLE "Case" ALTER COLUMN "legalExecutionMode" SET NOT NULL;');
+
+  const caseWithoutEvidence = await prisma.case.create({
+    data: {
+      tenantId: tenant.id,
+      caseRef: 'CASE-GUARD-NO-EVIDENCE',
+      status: CaseStatus.SUBMITTED,
+      tierSuggested: TierLevel.LOW,
+      legalExecutionMode: LegalExecutionMode.SELF_SERVICE
+    }
+  });
+
+  await assert.rejects(
+    () =>
+      casesService.transitionCase(tenant.id, actor.id, caseWithoutEvidence.caseRef, {
+        toState: CaseStatus.PAYOUT_CONFIRMED
+      }),
+    (error) => error instanceof BadRequestException
+  );
+
   const caseWithAttorney = await prisma.case.create({
     data: {
       tenantId: tenant.id,
@@ -63,6 +106,20 @@ async function main() {
       tierSuggested: TierLevel.MEDIUM,
       assignedAttorneyId: attorney.id,
       legalExecutionMode: LegalExecutionMode.ATTORNEY_REQUIRED
+    }
+  });
+
+  await prisma.payout.create({
+    data: {
+      tenantId: tenant.id,
+      caseId: caseWithAttorney.id,
+      caseRef: caseWithAttorney.caseRef,
+      amountCents: 1234,
+      currency: 'USD',
+      status: 'PENDING',
+      reference: 'evidence-payout',
+      evidenceKey: 'object-key-payout',
+      metadata: { evidenceSha256: 'hash-123' }
     }
   });
 

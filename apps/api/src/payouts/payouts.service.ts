@@ -9,6 +9,7 @@ import { AuditService } from '../audit/audit.service';
 import { CasesService } from '../cases/cases.service';
 import { prisma } from '../prisma/prisma.client';
 import { FeeCalculatorService } from './fee-calculator.service';
+import { assertPayoutConfirmable } from './payout-confirmation.guard';
 
 const payoutWithCaseArgs = Prisma.validator<Prisma.PayoutDefaultArgs>()({
   include: { case: true }
@@ -183,6 +184,11 @@ export class PayoutsService {
     }
 
     const caseRecord = await this.findCaseOrThrow(params.tenantId, params.caseRef);
+    assertPayoutConfirmable({
+      legalExecutionMode: caseRecord.legalExecutionMode,
+      assignedAttorneyId: caseRecord.assignedAttorneyId,
+      evidence: params.evidenceFile ? { evidenceKey: 'uploaded' } : null
+    });
     const fee = this.feeCalculator.calculate({ attorneyFeeCents: params.attorneyFeeCents });
 
     const evidenceKey = params.evidenceFile

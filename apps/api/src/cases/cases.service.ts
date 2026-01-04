@@ -10,6 +10,7 @@ import { CaseStatus, LegalExecutionMode, TierLevel } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { prisma } from '../prisma/prisma.client';
 import { LegalSafetyService } from '../safety/legal-safety.service';
+import { assertPayoutConfirmable } from '../payouts/payout-confirmation.guard';
 
 export type CreateCaseInput = {
   caseRef: string;
@@ -142,6 +143,37 @@ export class CasesService {
     });
 
     return { latest, hasUnconfirmed: unconfirmed > 0, hasConfirmed: latest?.status === 'CONFIRMED' };
+  }
+
+  private async resolvePayoutEvidence(
+    tenantId: string,
+    caseRecord: any,
+    payoutRecord?: any | null
+  ) {
+    const payoutMetadata = (payoutRecord?.metadata ?? {}) as Record<string, unknown>;
+    const evidenceSha256 = (payoutMetadata?.evidenceSha256 as string | null) ?? null;
+
+    if (payoutRecord?.evidenceKey || evidenceSha256) {
+      return {
+        evidenceKey: payoutRecord?.evidenceKey ?? null,
+        evidenceSha256,
+        artifactId: null
+      };
+    }
+
+    const payoutArtifact = await prisma.artifact.findFirst({
+      where: { tenantId, caseId: caseRecord.id, source: 'payout_confirmation' }
+    });
+
+    if (payoutArtifact) {
+      return {
+        evidenceKey: payoutArtifact.objectKey,
+        evidenceSha256: payoutArtifact.sha256,
+        artifactId: payoutArtifact.id
+      };
+    }
+
+    return { evidenceKey: null, evidenceSha256: null, artifactId: null };
   }
 
   private buildLocks(caseRecord: any, payoutState: Awaited<ReturnType<typeof this.getPayoutState>>): CaseLock[] {
@@ -585,6 +617,10 @@ export class CasesService {
       input.assignedAttorneyId !== undefined ? input.assignedAttorneyId : caseRecord.assignedAttorneyId;
 
     const payoutState = await this.getPayoutState(tenantId, caseRecord.id);
+    const payoutEvidence =
+      input.toState === CaseStatus.PAYOUT_CONFIRMED
+        ? await this.resolvePayoutEvidence(tenantId, caseRecord, payoutState.latest)
+        : null;
     const locks = this.buildLocks(caseRecord, payoutState);
     const lockBypassStates = [
       CaseStatus.PAYOUT_CONFIRMED,
@@ -607,11 +643,19 @@ export class CasesService {
     }
 
     if (
-      [CaseStatus.PAYOUT_CONFIRMED, CaseStatus.CLOSED].includes(input.toState) &&
+      input.toState === CaseStatus.CLOSED &&
       effectiveLegalExecutionMode === LegalExecutionMode.ATTORNEY_REQUIRED &&
       !effectiveAssignedAttorneyId
     ) {
       throw new BadRequestException('Attorney assignment required before payout confirmation or closure');
+    }
+
+    if (input.toState === CaseStatus.PAYOUT_CONFIRMED) {
+      assertPayoutConfirmable({
+        legalExecutionMode: effectiveLegalExecutionMode,
+        assignedAttorneyId: effectiveAssignedAttorneyId,
+        evidence: payoutEvidence
+      });
     }
 
     if (input.toState === CaseStatus.CLOSED) {
