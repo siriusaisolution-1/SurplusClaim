@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "./src",
+    "rootDir": "../",
     "lib": ["ES2020", "DOM"],
     "types": ["node"],
     "typeRoots": ["./node_modules/@types", "../../node_modules/@types"]
