@@ -24,6 +24,12 @@ export interface OrchestratorOptions {
   scrapydClient?: ScrapydClient;
 }
 
+export interface RunAllRetryOptions {
+  maxAttempts?: number;
+  baseDelayMs?: number;
+  wait?: (ms: number) => Promise<void>;
+}
+
 export class ConnectorOrchestrator {
   private readonly registry: ConnectorRegistry;
   private readonly state: ConnectorStateStore;
@@ -45,6 +51,28 @@ export class ConnectorOrchestrator {
       results.push({ connector, status });
     }
     return results;
+  }
+
+  async runAllConnectorsWithRetry(options?: RunAllRetryOptions) {
+    const wait = options?.wait ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
+    const maxAttempts = options?.maxAttempts ?? 3;
+    const baseDelayMs = options?.baseDelayMs ?? 1000;
+
+    let attempt = 0;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      attempt += 1;
+      try {
+        return await this.runAllConnectors();
+      } catch (error) {
+        if (attempt >= maxAttempts) {
+          throw error;
+        }
+
+        const delay = baseDelayMs * 2 ** (attempt - 1);
+        await wait(delay);
+      }
+    }
   }
 
   private audit(connector: ConnectorConfig, event: ConnectorAuditEvent['event'], payload?: Record<string, unknown>) {
