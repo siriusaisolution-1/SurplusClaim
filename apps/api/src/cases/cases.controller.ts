@@ -1,5 +1,5 @@
 import { Body, Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
-import { CaseStatus } from '@prisma/client';
+import { CaseStatus, Prisma } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { CurrentUser, Roles } from '../auth/auth.decorators';
@@ -34,16 +34,18 @@ export class CasesController {
       pageSize: pageSize ? parseInt(pageSize, 10) : undefined
     });
 
-      return {
-        total: response.total,
-        page: response.page,
-        pageSize: response.pageSize,
-        cases: response.data.map((item) => ({
-          id: item.id,
-          caseRef: item.caseRef,
-          status: item.status,
-          tierSuggested: item.tierSuggested,
-          tierConfirmed: item.tierConfirmed,
+    type CaseListItem = Prisma.CaseGetPayload<{ include: { assignedReviewer: true; assignedAttorney: true } }>;
+
+    return {
+      total: response.total,
+      page: response.page,
+      pageSize: response.pageSize,
+      cases: response.data.map((item: CaseListItem) => ({
+        id: item.id,
+        caseRef: item.caseRef,
+        status: item.status,
+        tierSuggested: item.tierSuggested,
+        tierConfirmed: item.tierConfirmed,
         assignedReviewer: item.assignedReviewer
           ? { id: item.assignedReviewer.id, email: item.assignedReviewer.email }
           : null,
