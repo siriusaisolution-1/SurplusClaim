@@ -26,7 +26,7 @@ export class CasesController {
     @Query('pageSize') pageSize?: string
   ) {
     const parsedStatus = status && Object.values(CaseStatus).includes(status) ? status : undefined;
-    const response: any = await this.casesService.listCases(user.tenantId, {
+    const response = await this.casesService.listCases(user.tenantId, {
       status: parsedStatus,
       search,
       needsTriage: needsTriage === 'true',
@@ -34,16 +34,16 @@ export class CasesController {
       pageSize: pageSize ? parseInt(pageSize, 10) : undefined
     });
 
-    return {
-      total: response.total,
-      page: response.page,
-      pageSize: response.pageSize,
-      cases: response.data.map((item) => ({
-        id: item.id,
-        caseRef: item.caseRef,
-        status: item.status,
-        tierSuggested: item.tierSuggested,
-        tierConfirmed: item.tierConfirmed,
+      return {
+        total: response.total,
+        page: response.page,
+        pageSize: response.pageSize,
+        cases: response.data.map((item) => ({
+          id: item.id,
+          caseRef: item.caseRef,
+          status: item.status,
+          tierSuggested: item.tierSuggested,
+          tierConfirmed: item.tierConfirmed,
         assignedReviewer: item.assignedReviewer
           ? { id: item.assignedReviewer.id, email: item.assignedReviewer.email }
           : null,
