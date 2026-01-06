@@ -163,8 +163,10 @@ export class CasesService {
         date: new Date()
       });
 
-      const existing = await prisma.case.findFirst({ where: { tenantId, caseRef: candidate } });
-      if (!existing) return candidate;
+      const existing = await prisma.$queryRaw<{ id: string }[]>(
+        Prisma.sql`SELECT id FROM "Case" WHERE "tenantId" = ${tenantId}::uuid AND "caseRef" = ${candidate} LIMIT 1`
+      );
+      if (!existing[0]) return candidate;
     }
 
     throw new ConflictException('Unable to generate a unique case reference');
@@ -177,8 +179,10 @@ export class CasesService {
     if (input.caseRef) {
       const providedRef = input.caseRef.toUpperCase();
       const parsed = parseCaseRef(providedRef);
-      const existing = await prisma.case.findFirst({ where: { tenantId, caseRef: providedRef } });
-      if (existing) {
+      const existing = await prisma.$queryRaw<{ id: string }[]>(
+        Prisma.sql`SELECT id FROM "Case" WHERE "tenantId" = ${tenantId}::uuid AND "caseRef" = ${providedRef} LIMIT 1`
+      );
+      if (existing[0]) {
         throw new ConflictException('Case with this reference already exists');
       }
 

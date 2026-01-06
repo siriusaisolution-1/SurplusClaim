@@ -6,6 +6,7 @@ import path from 'node:path';
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { AuditService } from '../audit/audit.service';
+import { findCaseByRefRaw } from '../prisma/case-lookup';
 import { prisma } from '../prisma/prisma.client';
 import { RulesService } from '../rules/rules.service';
 import { LegalSafetyService } from '../safety/legal-safety.service';
@@ -44,7 +45,7 @@ export class DocumentsService {
   }
 
   private async findCaseOrThrow(tenantId: string, caseRef: string) {
-    const caseRecord = await prisma.case.findFirst({ where: { tenantId, caseRef } });
+    const caseRecord = await findCaseByRefRaw(tenantId, caseRef);
     if (!caseRecord) {
       throw new NotFoundException('Case not found');
     }

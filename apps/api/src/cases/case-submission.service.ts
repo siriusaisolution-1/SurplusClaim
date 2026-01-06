@@ -3,6 +3,7 @@ import { CaseStatus } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { DocumentsService } from '../documents/documents.service';
+import { findCaseByRefRaw } from '../prisma/case-lookup';
 import { prisma } from '../prisma/prisma.client';
 import { CasesService } from './cases.service';
 
@@ -29,9 +30,7 @@ export class CaseSubmissionService {
       throw new BadRequestException('Evidence file is required to mark submission');
     }
 
-    const caseRecord = await prisma.case.findFirst({
-      where: { tenantId: input.tenantId, caseRef: input.caseRef }
-    });
+    const caseRecord = await findCaseByRefRaw(input.tenantId, input.caseRef);
 
     if (!caseRecord) {
       throw new NotFoundException('Case not found');

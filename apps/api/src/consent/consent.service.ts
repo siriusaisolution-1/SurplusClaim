@@ -7,6 +7,7 @@ import path from 'node:path';
 import jwt from 'jsonwebtoken';
 
 import { AuditService } from '../audit/audit.service';
+import { findCaseByRefRaw } from '../prisma/case-lookup';
 import { prisma } from '../prisma/prisma.client';
 
 type PresentConsentInput = { version?: string };
@@ -29,7 +30,7 @@ export class ConsentService {
   }
 
   async presentConsent(tenantId: string, actorId: string, caseRef: string, input: PresentConsentInput) {
-    const caseRecord = await prisma.case.findFirst({ where: { tenantId, caseRef } });
+    const caseRecord = await findCaseByRefRaw(tenantId, caseRef);
     if (!caseRecord) {
       throw new NotFoundException('Case not found');
     }
@@ -63,9 +64,7 @@ export class ConsentService {
 
   async signConsent(input: SignConsentInput) {
     const payload = this.verifyToken(input.token);
-    const caseRecord = await prisma.case.findFirst({
-      where: { tenantId: payload.tenantId, caseRef: payload.caseRef }
-    });
+    const caseRecord = await findCaseByRefRaw(payload.tenantId, payload.caseRef);
 
     if (!caseRecord) {
       throw new NotFoundException('Case not found');
