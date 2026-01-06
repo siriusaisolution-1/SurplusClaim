@@ -19,29 +19,29 @@ export class RulesController {
 
   @Get(':state/:countyCode')
   @Roles('TENANT_ADMIN', 'REVIEWER', 'OPS', 'READ_ONLY')
-  async getRules(
+  getRule(@Param('state') state: string, @Param('countyCode') countyCode: string) {
+    return { rule: this.rulesService.getRule(state, countyCode) };
+  }
+
+  @Get(':state/:countyCode/checklist')
+  @Roles('TENANT_ADMIN', 'REVIEWER', 'OPS', 'READ_ONLY')
+  async getChecklist(
     @Param('state') state: string,
     @Param('countyCode') countyCode: string,
     @Query('case_ref') caseRef?: string,
     @CurrentUser() user?: any
   ) {
-    const rule = this.rulesService.getRule(state, countyCode);
-    const baseChecklist = caseRef
-      ? this.rulesService.buildChecklist({ case_ref: caseRef, state, county_code: countyCode })
-      : null;
+    const baseChecklist = this.rulesService.buildChecklist({
+      case_ref: caseRef ?? 'PREVIEW',
+      state,
+      county_code: countyCode
+    });
 
-    const checklist =
-      caseRef && baseChecklist && user
-        ? {
-            ...baseChecklist,
-            items: await this.documentsService.mergeChecklistWithDocuments(
-              user.tenantId,
-              caseRef,
-              baseChecklist.items
-            )
-          }
-        : baseChecklist;
+    const items =
+      caseRef && user
+        ? await this.documentsService.mergeChecklistWithDocuments(user.tenantId, caseRef, baseChecklist.items)
+        : baseChecklist.items;
 
-    return { rule, checklist };
+    return { checklist: { ...baseChecklist, items } };
   }
 }
