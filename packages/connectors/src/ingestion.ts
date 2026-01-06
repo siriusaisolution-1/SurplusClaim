@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+import { RulesRegistry } from '@surplus/rules';
 import { NormalizedCase, NormalizedCaseSchema, generateCaseRef } from '@surplus/shared';
 
 import { CaseBuilderInput, ConnectorStateStore, IngestionResult } from './state';
@@ -14,7 +15,10 @@ function asDateString(value?: string): string {
 }
 
 export class CaseIngestionService {
-  constructor(private readonly store: ConnectorStateStore) {}
+  constructor(
+    private readonly store: ConnectorStateStore,
+    private readonly rulesRegistry: RulesRegistry = new RulesRegistry()
+  ) {}
 
   private computeSha(input: unknown): string {
     return createHash('sha256').update(JSON.stringify(input ?? {})).digest('hex');
@@ -89,6 +93,9 @@ export class CaseIngestionService {
         }
 
         const normalized = this.buildNormalizedCase(connector, item);
+        if (!this.rulesRegistry.isJurisdictionEnabled(normalized.state, normalized.county_code)) {
+          throw new Error(`Jurisdiction ${normalized.state}/${normalized.county_code} is not enabled for ingestion`);
+        }
         const record = this.buildCaseRecord({
           caseRef: normalized.case_ref,
           normalized,

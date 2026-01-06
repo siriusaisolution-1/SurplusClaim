@@ -1,5 +1,13 @@
 import { useRouter } from 'next/router';
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  type FC,
+  type PropsWithChildren,
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState
+} from 'react';
 
 import { API_BASE_URL } from './api';
 
@@ -39,7 +47,7 @@ function clearSession() {
   localStorage.removeItem('auth:refreshToken');
 }
 
-export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
+export const AuthProvider: FC<PropsWithChildren> = ({ children }) => {
   const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);

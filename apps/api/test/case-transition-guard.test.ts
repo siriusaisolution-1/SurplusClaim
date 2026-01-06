@@ -266,6 +266,64 @@ async function main() {
 
   assert.strictEqual(finalClosed.status, CaseStatus.CLOSED);
 
+  const requiresConfirmation = await prisma.case.create({
+    data: {
+      tenantId: tenant.id,
+      caseRef: 'CASE-GUARD-CONFIRM',
+      status: CaseStatus.PAYOUT_CONFIRMED,
+      tierSuggested: TierLevel.MEDIUM,
+      assignedAttorneyId: attorney.id,
+      legalExecutionMode: LegalExecutionMode.ATTORNEY_REQUIRED,
+      closureConfirmationRequired: true
+    }
+  });
+
+  await prisma.payout.create({
+    data: {
+      tenantId: tenant.id,
+      caseId: requiresConfirmation.id,
+      caseRef: requiresConfirmation.caseRef,
+      amountCents: 12500,
+      currency: 'USD',
+      status: 'CONFIRMED',
+      reference: 'ready-to-close-with-confirmation',
+      processedAt: new Date(),
+      confirmedAt: new Date(),
+      confirmedBy: actor.id,
+      evidenceKey: 'confirmation-evidence',
+      feeCents: 1200,
+      feeRateBps: 1000,
+      metadata: { attorneyFeeCents: 3000, evidenceSha256: 'hash-confirmation' }
+    }
+  });
+
+  await assert.rejects(
+    () =>
+      casesService.transitionCase(tenant.id, actor.id, requiresConfirmation.caseRef, {
+        toState: CaseStatus.CLOSED
+      }),
+    (error) => error instanceof BadRequestException
+  );
+
+  await prisma.caseEvent.create({
+    data: {
+      tenantId: tenant.id,
+      caseId: requiresConfirmation.id,
+      caseRef: requiresConfirmation.caseRef,
+      type: 'CLOSURE_CONFIRMED',
+      payload: { confirmedBy: actor.id }
+    }
+  });
+
+  const confirmedClose = await casesService.transitionCase(
+    tenant.id,
+    actor.id,
+    requiresConfirmation.caseRef,
+    { toState: CaseStatus.CLOSED }
+  );
+
+  assert.strictEqual(confirmedClose.status, CaseStatus.CLOSED);
+
   console.log('Case transition guard tests passed');
 }
 

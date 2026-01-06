@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 
 import { ChecklistItem, JurisdictionRule, JurisdictionRuleSchema, getDefaultRulesDirectory } from './schemas';
 
@@ -84,6 +84,12 @@ export class RulesRegistry {
     if (!rule) return undefined;
     if (!this.isEnabled(rule)) return undefined;
     return rule;
+  }
+
+  isJurisdictionEnabled(state: string, countyCode: string): boolean {
+    const rule = this.rules.get(buildKey(state, countyCode));
+    if (!rule) return false;
+    return this.isEnabled(rule);
   }
 
   getChecklistItems(state: string, countyCode: string): ChecklistItem[] {

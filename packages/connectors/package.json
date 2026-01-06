@@ -12,6 +12,7 @@
     "format": "prettier --write 'src/**/*.ts'"
   },
   "dependencies": {
+    "@surplus/rules": "workspace:*",
     "@surplus/shared": "workspace:*"
   },
   "devDependencies": {
