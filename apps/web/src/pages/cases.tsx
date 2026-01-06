@@ -7,6 +7,7 @@ import { API_BASE_URL } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
 import { submitPayoutConfirmation } from '../lib/payout-submit';
 import { formatSafeLabel, sanitizeDocType } from '../lib/safety';
+import { ChecklistList } from '../components/ChecklistList';
 
 const CASE_STATUSES = [
   'DISCOVERED',
@@ -441,22 +442,32 @@ export default function CasesPage() {
     setLoadingRules(true);
     setRulesError(null);
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/rules/${jurisdiction.state}/${jurisdiction.county_code}?case_ref=${caseRef}`,
-        {
+      const [ruleResponse, checklistResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/rules/${jurisdiction.state}/${jurisdiction.county_code}`, {
           headers: {
             Authorization: `Bearer ${accessToken}`
           }
-        }
-      );
+        }),
+        fetch(
+          `${API_BASE_URL}/rules/${jurisdiction.state}/${jurisdiction.county_code}/checklist?case_ref=${caseRef}`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`
+            }
+          }
+        )
+      ]);
 
-      if (!response.ok) {
+      if (!ruleResponse.ok || !checklistResponse.ok) {
         throw new Error('Unable to load rules');
       }
 
-      const payload = await response.json();
-      setRuleDetails(payload.rule ?? null);
-      setChecklistItems(payload.checklist?.items ?? []);
+      const [rulePayload, checklistPayload] = await Promise.all([
+        ruleResponse.json(),
+        checklistResponse.json()
+      ]);
+      setRuleDetails(rulePayload.rule ?? null);
+      setChecklistItems(checklistPayload.checklist?.items ?? []);
     } catch (err: unknown) {
       setRulesError(toMessage(err, 'Unable to load jurisdiction rules'));
       setRuleDetails(null);
@@ -1101,34 +1112,7 @@ export default function CasesPage() {
                           />
                         </div>
                         <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
-                          {checklistItems.map((item) => (
-                            <div
-                              key={item.id}
-                              style={{ borderBottom: '1px solid #1f2937', padding: '0.5rem 0' }}
-                            >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div>
-                                  <strong>{item.title}</strong>
-                                  {item.description && (
-                                    <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>{item.description}</div>
-                                  )}
-                                  {item.conditions && (
-                                    <div style={{ color: '#c084fc', fontSize: '0.85rem' }}>{item.conditions}</div>
-                                  )}
-                                </div>
-                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                                  <span className="tag">{item.type === 'form' ? 'Form' : 'Document'}</span>
-                                  <span
-                                    className="tag"
-                                    style={{ background: item.completed ? '#10b981' : '#6b7280' }}
-                                  >
-                                    {item.completed ? 'Complete' : 'Pending'}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                          {checklistItems.length === 0 && <p style={{ color: '#9ca3af' }}>No checklist items</p>}
+                          <ChecklistList items={checklistItems} />
                         </div>
                       </>
                     )}

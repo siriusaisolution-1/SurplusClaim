@@ -8,7 +8,7 @@ export class RulesService {
   private checklist = new ChecklistGenerator(this.registry);
 
   listJurisdictions() {
-    return this.registry.listJurisdictions();
+    return this.registry.listJurisdictions().filter((jurisdiction) => jurisdiction.enabled);
   }
 
   getRule(state: string, countyCode: string) {
@@ -20,10 +20,7 @@ export class RulesService {
   }
 
   buildChecklist(context: CaseChecklistContext) {
-    const rule = this.registry.getRule(context.state, context.county_code);
-    if (!rule) {
-      throw new NotFoundException('Rules not found for jurisdiction');
-    }
+    const rule = this.getRule(context.state, context.county_code);
     return {
       jurisdiction: {
         state: rule.state,
