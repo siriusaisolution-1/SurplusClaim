@@ -38,8 +38,13 @@ async function seedTenant() {
   return { tenant, admin, attorney };
 }
 
-function auth(server: any, token: string) {
-  return request(server).set('Authorization', `Bearer ${token}`);
+function authed(server: any, token: string) {
+  const authHeader = { Authorization: `Bearer ${token}` };
+
+  return {
+    post: (path: string) => request(server).post(path).set(authHeader),
+    get: (path: string) => request(server).get(path).set(authHeader)
+  };
 }
 
 async function main() {
@@ -54,7 +59,7 @@ async function main() {
   const token = login.body.accessToken;
   assert.ok(token, 'login should return an access token');
 
-  const created = await auth(server, token)
+  const created = await authed(server, token)
     .post('/cases')
     .send({
       jurisdiction: { state: 'GA', countycode: 'FULTON' },
@@ -68,7 +73,7 @@ async function main() {
   assert.strictEqual(created.body.case.status, CaseStatus.DISCOVERED);
 
   const transition = async (toState: CaseStatus) => {
-    const res = await auth(server, token)
+    const res = await authed(server, token)
       .post(`/cases/${caseRef}/transition`)
       .send({ toState, reason: 'e2e-progress' })
       .expect(201);
@@ -78,7 +83,7 @@ async function main() {
   await transition(CaseStatus.TRIAGED);
   await transition(CaseStatus.CLIENT_CONTACTED);
 
-  const presented = await auth(server, token)
+  const presented = await authed(server, token)
     .post(`/consents/cases/${caseRef}/present`)
     .send({ version: 'v1' })
     .expect(201);
@@ -93,7 +98,7 @@ async function main() {
 
   await transition(CaseStatus.DOCUMENT_COLLECTION);
 
-  const documentUpload = await auth(server, token)
+  const documentUpload = await authed(server, token)
     .post(`/cases/${caseRef}/documents/upload`)
     .attach('file', Buffer.from('mock-document'), 'id-proof.pdf')
     .field('docType', 'id_proof')
@@ -102,7 +107,7 @@ async function main() {
 
   await transition(CaseStatus.PACKAGE_READY);
 
-  const submission = await auth(server, token)
+  const submission = await authed(server, token)
     .post(`/cases/${caseRef}/submission`)
     .attach('file', Buffer.from('submission-evidence'), 'evidence.pdf')
     .field('channel', 'portal')
@@ -111,7 +116,7 @@ async function main() {
 
   const payoutAmount = 100_000;
   const attorneyFee = 20_000;
-  const payout = await auth(server, token)
+  const payout = await authed(server, token)
     .post(`/cases/${caseRef}/payouts/confirm`)
     .attach('evidence', Buffer.from('payout-proof'), 'payout.txt')
     .field('amountCents', payoutAmount)
@@ -126,11 +131,11 @@ async function main() {
   assert.ok(payout.body.invoice.id, 'invoice should be created');
   assert.ok(payout.body.evidence.sha256, 'evidence hash recorded');
 
-  const payoutsList = await auth(server, token).get(`/cases/${caseRef}/payouts`).expect(200);
+  const payoutsList = await authed(server, token).get(`/cases/${caseRef}/payouts`).expect(200);
   assert.strictEqual(payoutsList.body.latestInvoice.id, payout.body.invoice.id);
   assert.strictEqual(payoutsList.body.latestPayout.feeCents, payout.body.fee.feeCents);
 
-  const auditStatus = await auth(server, token).get('/audit/verify').expect(200);
+  const auditStatus = await authed(server, token).get('/audit/verify').expect(200);
   assert.strictEqual(auditStatus.body.isValid, true, 'audit chain should be valid');
 
   console.log('Happy path E2E test completed successfully');
