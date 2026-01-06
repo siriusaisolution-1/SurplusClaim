@@ -17,6 +17,13 @@ module.exports = {
     node: true,
     es2020: true
   },
+  settings: {
+    'import/resolver': {
+      typescript: {
+        project: ['./tsconfig.base.json']
+      }
+    }
+  },
   rules: {
     'import/order': [
       'error',
