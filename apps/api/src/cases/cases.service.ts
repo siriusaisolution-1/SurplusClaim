@@ -6,6 +6,8 @@ import {
   NotFoundException
 } from '@nestjs/common';
 import { CaseStatus, LegalExecutionMode, Prisma, TierLevel } from '@prisma/client';
+import { RulesRegistry } from '@surplus/rules';
+import { parseCaseRef } from '@surplus/shared';
 
 import { AuditService } from '../audit/audit.service';
 import { prisma } from '../prisma/prisma.client';
@@ -119,6 +121,8 @@ const allowedTransitions: Record<CaseStatus, CaseStatus[]> = {
 
 @Injectable()
 export class CasesService {
+  private readonly rulesRegistry = new RulesRegistry();
+
   constructor(private auditService: AuditService, private legalSafety: LegalSafetyService) {}
 
   getAllowedTransitions(status: CaseStatus): CaseStatus[] {
@@ -364,6 +368,31 @@ export class CasesService {
 
   async createCase(tenantId: string, actorId: string, input: CreateCaseInput) {
     const tierSuggested = input.tierSuggested ?? TierLevel.LOW;
+
+    let jurisdiction: { state: string; countyCode: string };
+    try {
+      const parsed = parseCaseRef(input.caseRef);
+      jurisdiction = { state: parsed.state, countyCode: parsed.countyCode };
+    } catch {
+      throw new BadRequestException('Invalid case reference format');
+    }
+
+    if (!this.rulesRegistry.isJurisdictionEnabled(jurisdiction.state, jurisdiction.countyCode)) {
+      await this.auditService.logAction({
+        tenantId,
+        actorId,
+        caseRef: input.caseRef,
+        action: 'CASE_CREATION_REJECTED',
+        metadata: {
+          reason: 'jurisdiction_not_enabled',
+          state: jurisdiction.state,
+          county_code: jurisdiction.countyCode
+        }
+      });
+      throw new BadRequestException(
+        `Jurisdiction ${jurisdiction.state}/${jurisdiction.countyCode} is not enabled for intake`
+      );
+    }
 
     const existing = await prisma.case.findFirst({ where: { tenantId, caseRef: input.caseRef } });
     if (existing) {
@@ -704,6 +733,16 @@ export class CasesService {
     if (input.toState === CaseStatus.CLOSED) {
       if (locks.some((lock) => lock.code === 'UNCONFIRMED_PAYOUT')) {
         throw new BadRequestException('Cannot close case while payout is still unconfirmed');
+      }
+
+      if (caseRecord.closureConfirmationRequired) {
+        const confirmation = await prisma.caseEvent.findFirst({
+          where: { tenantId, caseId: caseRecord.id, type: 'CLOSURE_CONFIRMED' }
+        });
+
+        if (!confirmation) {
+          throw new BadRequestException('Closure confirmation required before closing case');
+        }
       }
 
       const latestPayout = payoutState.latest;

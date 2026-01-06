@@ -198,6 +198,9 @@ importers:
 
   packages/connectors:
     dependencies:
+      '@surplus/rules':
+        specifier: workspace:*
+        version: link:../rules
       '@surplus/shared':
         specifier: workspace:*
         version: link:../shared

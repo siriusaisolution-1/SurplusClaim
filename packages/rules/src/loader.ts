@@ -86,6 +86,12 @@ export class RulesRegistry {
     return rule;
   }
 
+  isJurisdictionEnabled(state: string, countyCode: string): boolean {
+    const rule = this.rules.get(buildKey(state, countyCode));
+    if (!rule) return false;
+    return this.isEnabled(rule);
+  }
+
   getChecklistItems(state: string, countyCode: string): ChecklistItem[] {
     const rule = this.getRule(state, countyCode);
 
