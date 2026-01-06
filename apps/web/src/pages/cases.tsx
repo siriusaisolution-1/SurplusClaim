@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { NavBar } from '../components/NavBar';
 import { API_BASE_URL } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
+import { submitPayoutConfirmation } from '../lib/payout-submit';
 import { formatSafeLabel, sanitizeDocType } from '../lib/safety';
 
 const CASE_STATUSES = [
@@ -649,26 +650,17 @@ export default function CasesPage() {
 
     setPayoutStatus('Confirming payout...');
     try {
-      const formData = new FormData();
-      formData.append('amountCents', parsedAmount.toString());
-      formData.append('attorneyFeeCents', parsedAttorneyFee.toString());
-      if (payoutReference) formData.append('reference', payoutReference);
-      if (payoutNote) formData.append('note', payoutNote);
-      formData.append('evidence', trustDisbursementEvidence);
-      if (closeAfterPayout) formData.append('closeCase', 'true');
-
-      const response = await fetch(`${API_BASE_URL}/cases/${selectedRef}/payouts/confirm`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: formData
+      const payload = await submitPayoutConfirmation({
+        apiBaseUrl: API_BASE_URL,
+        token: accessToken,
+        caseRef: selectedRef,
+        payoutAmountCents: parsedAmount,
+        attorneyFeeCents: parsedAttorneyFee,
+        reference: payoutReference,
+        note: payoutNote,
+        evidence: trustDisbursementEvidence,
+        closeCase: closeAfterPayout
       });
-
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({}));
-        throw new Error(errorBody.message ?? 'Unable to confirm payout');
-      }
-
-      const payload = await response.json();
       setPayoutSummary({ latestInvoice: payload.invoice ?? null, latestPayout: payload.payout ?? null });
       setPayoutStatus('Payout confirmed and invoice drafted.');
       setTrustDisbursementEvidence(null);

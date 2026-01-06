@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node ./test/legal-safety.test.js",
+    "test": "node ./test/legal-safety.test.js && node ./test/payout-form.test.js",
     "format": "prettier --write 'src/**/*.{ts,tsx}'"
   },
   "dependencies": {
