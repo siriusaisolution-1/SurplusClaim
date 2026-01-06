@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { CaseStatus, LegalExecutionMode, Prisma, TierLevel } from '@prisma/client';
 import { RulesRegistry } from '@surplus/rules';
-import { parseCaseRef } from '@surplus/shared';
+import { generateCaseRef, parseCaseRef } from '@surplus/shared';
 
 import { AuditService } from '../audit/audit.service';
 import { prisma } from '../prisma/prisma.client';
@@ -15,7 +15,8 @@ import { LegalSafetyService } from '../safety/legal-safety.service';
 import { assertPayoutConfirmable } from '../payouts/payout-confirmation.guard';
 
 export type CreateCaseInput = {
-  caseRef: string;
+  caseRef?: string;
+  jurisdiction?: { state: string; countycode: string };
   tierSuggested?: TierLevel;
   assignedReviewerId?: string | null;
   assignedAttorneyId?: string | null;
@@ -147,6 +148,55 @@ export class CasesService {
     });
 
     return { latest, hasUnconfirmed: unconfirmed > 0, hasConfirmed: latest?.status === 'CONFIRMED' };
+  }
+
+  private async generateUniqueCaseRef(
+    tenantId: string,
+    jurisdiction: { state: string; countyCode: string }
+  ): Promise<string> {
+    const attempts = 5;
+
+    for (let i = 0; i < attempts; i += 1) {
+      const candidate = generateCaseRef({
+        state: jurisdiction.state,
+        countycode: jurisdiction.countyCode,
+        date: new Date()
+      });
+
+      const existing = await prisma.case.findFirst({ where: { tenantId, caseRef: candidate } });
+      if (!existing) return candidate;
+    }
+
+    throw new ConflictException('Unable to generate a unique case reference');
+  }
+
+  private async resolveCaseRef(
+    tenantId: string,
+    input: CreateCaseInput
+  ): Promise<{ caseRef: string; jurisdiction: { state: string; countyCode: string } }> {
+    if (input.caseRef) {
+      const providedRef = input.caseRef.toUpperCase();
+      const parsed = parseCaseRef(providedRef);
+      const existing = await prisma.case.findFirst({ where: { tenantId, caseRef: providedRef } });
+      if (existing) {
+        throw new ConflictException('Case with this reference already exists');
+      }
+
+      return { caseRef: providedRef, jurisdiction: { state: parsed.state, countyCode: parsed.countyCode } };
+    }
+
+    if (!input.jurisdiction?.state || !input.jurisdiction?.countycode) {
+      throw new BadRequestException('Provide a case reference or jurisdiction to generate one');
+    }
+
+    const normalized = {
+      state: input.jurisdiction.state.toUpperCase(),
+      countyCode: input.jurisdiction.countycode.toUpperCase()
+    };
+
+    const generated = await this.generateUniqueCaseRef(tenantId, normalized);
+    const parsed = parseCaseRef(generated);
+    return { caseRef: generated, jurisdiction: { state: parsed.state, countyCode: parsed.countyCode } };
   }
 
   private async resolvePayoutEvidence(
@@ -369,19 +419,21 @@ export class CasesService {
   async createCase(tenantId: string, actorId: string, input: CreateCaseInput) {
     const tierSuggested = input.tierSuggested ?? TierLevel.LOW;
 
-    let jurisdiction: { state: string; countyCode: string };
+    let resolved: { caseRef: string; jurisdiction: { state: string; countyCode: string } };
     try {
-      const parsed = parseCaseRef(input.caseRef);
-      jurisdiction = { state: parsed.state, countyCode: parsed.countyCode };
-    } catch {
+      resolved = await this.resolveCaseRef(tenantId, input);
+    } catch (error) {
+      if (error instanceof ConflictException || error instanceof BadRequestException) throw error;
       throw new BadRequestException('Invalid case reference format');
     }
+
+    const { caseRef, jurisdiction } = resolved;
 
     if (!this.rulesRegistry.isJurisdictionEnabled(jurisdiction.state, jurisdiction.countyCode)) {
       await this.auditService.logAction({
         tenantId,
         actorId,
-        caseRef: input.caseRef,
+        caseRef,
         action: 'CASE_CREATION_REJECTED',
         metadata: {
           reason: 'jurisdiction_not_enabled',
@@ -394,16 +446,11 @@ export class CasesService {
       );
     }
 
-    const existing = await prisma.case.findFirst({ where: { tenantId, caseRef: input.caseRef } });
-    if (existing) {
-      throw new ConflictException('Case with this reference already exists');
-    }
-
     const createdCase = await prisma.$transaction(async (tx) => {
       const caseRecord = await tx.case.create({
         data: {
           tenantId,
-          caseRef: input.caseRef,
+          caseRef,
           status: CaseStatus.DISCOVERED,
           tierSuggested,
           assignedReviewerId: input.assignedReviewerId ?? null,
