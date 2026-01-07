@@ -35,11 +35,7 @@ function canReach(host, port) {
 
 (async () => {
   try {
-    if (!skipPrismaSetup) {
-      run('pnpm exec prisma generate --schema ./prisma/schema.prisma');
-    } else {
-      console.log('Skipping Prisma client generation (SKIP_PRISMA_DB_SETUP=true)');
-    }
+    run('pnpm exec prisma generate --schema ./prisma/schema.prisma');
 
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/legal-safety.test.ts');
 
@@ -52,20 +48,11 @@ function canReach(host, port) {
       return;
     }
 
-    if (!skipPrismaSetup) {
-      run('pnpm exec prisma migrate deploy --schema ./prisma/schema.prisma');
-    } else {
-      console.log('Skipping Prisma migrate deploy (SKIP_PRISMA_DB_SETUP=true)');
-    }
+    run('pnpm exec prisma migrate deploy --schema ./prisma/schema.prisma');
 
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/fee-calculator.test.ts');
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/case-transition-guard.test.ts');
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/integration.test.ts');
-    if (skipPrismaSetup) {
-      console.log('Ensuring Prisma client and migrations for E2E test');
-      run('pnpm exec prisma generate --schema ./prisma/schema.prisma');
-      run('pnpm exec prisma migrate deploy --schema ./prisma/schema.prisma');
-    }
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/e2e/happy-path.test.ts');
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);

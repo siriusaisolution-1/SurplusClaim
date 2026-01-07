@@ -1,5 +1,5 @@
 import { Body, Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
-import { CaseStatus } from '@prisma/client';
+import { CaseStatus, Prisma } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { CurrentUser, Roles } from '../auth/auth.decorators';
@@ -25,8 +25,16 @@ export class CasesController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string
   ) {
+    type CaseWithAssignees = Prisma.CaseGetPayload<{
+      include: { assignedReviewer: true; assignedAttorney: true };
+    }>;
     const parsedStatus = status && Object.values(CaseStatus).includes(status) ? status : undefined;
-    const response: any = await this.casesService.listCases(user.tenantId, {
+    const response: {
+      total: number;
+      data: CaseWithAssignees[];
+      page: number;
+      pageSize: number;
+    } = await this.casesService.listCases(user.tenantId, {
       status: parsedStatus,
       search,
       needsTriage: needsTriage === 'true',
