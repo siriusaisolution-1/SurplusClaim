@@ -1,7 +1,6 @@
 import path from 'node:path';
 
 import { BadRequestException } from '@nestjs/common';
-import type { Request } from 'express';
 import type { Options as MulterOptions } from 'multer';
 
 export const MAX_UPLOAD_BYTES = parseInt(process.env.MAX_UPLOAD_BYTES ?? '5242880', 10); // 5 MiB default
@@ -27,7 +26,7 @@ export function validateFileInput(file: Express.Multer.File | undefined) {
 
 export type MulterFileFilter = NonNullable<MulterOptions['fileFilter']>;
 
-export const uploadFileFilter: MulterFileFilter = (_req: Request, file, cb) => {
+export const uploadFileFilter: MulterFileFilter = (_req, file, cb) => {
   try {
     validateFileInput(file);
     cb(null, true);
