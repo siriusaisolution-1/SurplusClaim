@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, UploadedFile, UseInterceptors, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import multer, { type Options as MulterOptions } from 'multer';
+import type { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
+import multer from 'multer';
 
 import { CurrentUser, Roles } from '../auth/auth.decorators';
 import { DocumentStatus, DocumentsService } from './documents.service';
