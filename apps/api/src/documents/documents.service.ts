@@ -10,7 +10,7 @@ import { findCaseByRefRaw } from '../prisma/case-lookup';
 import { prisma } from '../prisma/prisma.client';
 import { RulesService } from '../rules/rules.service';
 import { LegalSafetyService } from '../safety/legal-safety.service';
-import { validateFileInput } from './upload.config';
+import { validateFileInput, validateUploadedFileBuffer } from './upload.config';
 
 export interface DocumentUploadResult {
   document: any;
@@ -150,6 +150,7 @@ export class DocumentsService {
     docType?: string;
   }): Promise<DocumentUploadResult> {
     validateFileInput(params.file);
+    validateUploadedFileBuffer(params.file);
 
     const caseRecord = await this.findCaseOrThrow(params.tenantId, params.caseRef);
     const objectKey = this.buildObjectKey(caseRecord.caseRef, params.file.originalname);

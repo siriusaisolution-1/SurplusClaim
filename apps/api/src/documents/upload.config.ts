@@ -20,12 +20,22 @@ export function validateFileInput(file: UploadFile | undefined) {
   }
 
   const extension = path.extname(file.originalname).toLowerCase();
-  const size = file.size ?? file.buffer?.length ?? 0;
 
   if (!ALLOWED_MIME_TYPES.includes(file.mimetype) || !ALLOWED_EXTENSIONS.includes(extension)) {
     throw new BadRequestException('Invalid file type. Only PDF and image files are allowed');
   }
 
+  if (typeof file.size === 'number' && file.size > MAX_UPLOAD_BYTES) {
+    throw new BadRequestException('File is empty or exceeds the maximum allowed size');
+  }
+}
+
+export function validateUploadedFileBuffer(file: UploadFile | undefined) {
+  if (!file?.buffer) {
+    throw new BadRequestException('File is empty or exceeds the maximum allowed size');
+  }
+
+  const size = file.buffer.length;
   if (size === 0 || size > MAX_UPLOAD_BYTES) {
     throw new BadRequestException('File is empty or exceeds the maximum allowed size');
   }
