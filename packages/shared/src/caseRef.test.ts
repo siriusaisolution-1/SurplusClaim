@@ -35,7 +35,9 @@ describe('case reference generation', () => {
 
   it('fails validation when check digit is wrong', () => {
     const caseRef = generateCaseRef({ state: 'IL', countycode: 'COOK', date: '2024-01-01' });
-    const invalid = `${caseRef.slice(0, -1)}Z`;
+    const expectedDigit = caseRef.slice(-1);
+    const invalidDigit = expectedDigit === '0' ? '1' : '0';
+    const invalid = `${caseRef.slice(0, -1)}${invalidDigit}`;
 
     expect(validateCaseRef(invalid)).toBe(false);
     expect(() => parseCaseRef(invalid)).toThrowError('Invalid check digit');
