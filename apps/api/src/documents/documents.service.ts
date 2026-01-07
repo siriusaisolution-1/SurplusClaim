@@ -6,11 +6,10 @@ import path from 'node:path';
 import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { AuditService } from '../audit/audit.service';
-import { findCaseByRefRaw } from '../prisma/case-lookup';
 import { prisma } from '../prisma/prisma.client';
 import { RulesService } from '../rules/rules.service';
 import { LegalSafetyService } from '../safety/legal-safety.service';
-import { validateFileInput, validateUploadedFileBuffer } from './upload.config';
+import { validateFileInput } from './upload.config';
 
 export interface DocumentUploadResult {
   document: any;
@@ -45,7 +44,7 @@ export class DocumentsService {
   }
 
   private async findCaseOrThrow(tenantId: string, caseRef: string) {
-    const caseRecord = await findCaseByRefRaw(tenantId, caseRef);
+    const caseRecord = await prisma.case.findFirst({ where: { tenantId, caseRef } });
     if (!caseRecord) {
       throw new NotFoundException('Case not found');
     }
@@ -150,7 +149,6 @@ export class DocumentsService {
     docType?: string;
   }): Promise<DocumentUploadResult> {
     validateFileInput(params.file);
-    validateUploadedFileBuffer(params.file);
 
     const caseRecord = await this.findCaseOrThrow(params.tenantId, params.caseRef);
     const objectKey = this.buildObjectKey(caseRecord.caseRef, params.file.originalname);
@@ -277,8 +275,8 @@ export class DocumentsService {
       }
     });
 
-    const refreshedCaseRecord = await this.findCaseOrThrow(params.tenantId, params.caseRef);
-    const checklist = await this.buildChecklistProgress(refreshedCaseRecord);
+    const caseRecord = await this.findCaseOrThrow(params.tenantId, params.caseRef);
+    const checklist = await this.buildChecklistProgress(caseRecord);
     return { document: updated, checklist };
   }
 

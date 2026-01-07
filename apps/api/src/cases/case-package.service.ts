@@ -9,7 +9,6 @@ import PDFDocument from 'pdfkit';
 
 import { AuditService } from '../audit/audit.service';
 import { DocumentsService } from '../documents/documents.service';
-import { findCaseByRefRaw } from '../prisma/case-lookup';
 import { prisma } from '../prisma/prisma.client';
 
 const PACKAGE_DIR = path.join(process.cwd(), 'apps', 'api', 'storage', 'packages');
@@ -200,15 +199,10 @@ export class CasePackageService {
   }
 
   async generatePackage(tenantId: string, actorId: string, caseRef: string) {
-    const baseCase = await findCaseByRefRaw(tenantId, caseRef);
-    const caseRecord = baseCase
-      ? {
-          ...baseCase,
-          assignedReviewer: baseCase.assignedReviewerId
-            ? await prisma.user.findUnique({ where: { id: baseCase.assignedReviewerId } })
-            : null
-        }
-      : null;
+    const caseRecord = await prisma.case.findFirst({
+      where: { tenantId, caseRef },
+      include: { assignedReviewer: true }
+    });
 
     if (!caseRecord) {
       await this.auditService.logAction({

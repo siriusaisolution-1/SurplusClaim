@@ -163,10 +163,8 @@ export class CasesService {
         date: new Date()
       });
 
-      const existing = await prisma.$queryRaw<{ id: string }[]>(
-        Prisma.sql`SELECT id FROM "Case" WHERE "tenantId" = ${tenantId}::uuid AND "caseRef" = ${candidate} LIMIT 1`
-      );
-      if (!existing[0]) return candidate;
+      const existing = await prisma.case.findFirst({ where: { tenantId, caseRef: candidate } });
+      if (!existing) return candidate;
     }
 
     throw new ConflictException('Unable to generate a unique case reference');
@@ -179,10 +177,8 @@ export class CasesService {
     if (input.caseRef) {
       const providedRef = input.caseRef.toUpperCase();
       const parsed = parseCaseRef(providedRef);
-      const existing = await prisma.$queryRaw<{ id: string }[]>(
-        Prisma.sql`SELECT id FROM "Case" WHERE "tenantId" = ${tenantId}::uuid AND "caseRef" = ${providedRef} LIMIT 1`
-      );
-      if (existing[0]) {
+      const existing = await prisma.case.findFirst({ where: { tenantId, caseRef: providedRef } });
+      if (existing) {
         throw new ConflictException('Case with this reference already exists');
       }
 
@@ -344,40 +340,53 @@ export class CasesService {
   }
 
   async findByCaseRef(tenantId: string, caseRef: string) {
-    const rows = await prisma.$queryRaw<
-      Array<{
-        id: string;
-        tenantId: string;
-        caseRef: string;
-        status: CaseStatus;
-        tierSuggested: TierLevel;
-        tierConfirmed: TierLevel | null;
-        assignedReviewerId: string | null;
-        assignedAttorneyId: string | null;
-        legalExecutionMode: LegalExecutionMode | null;
-        expectedPayoutWindow: string | null;
-        closureConfirmationRequired: boolean;
-        metadata: Record<string, unknown> | null;
-        createdAt: Date;
-        updatedAt: Date;
-      }>
-    >(
-      Prisma.sql`SELECT * FROM "Case" WHERE "tenantId" = ${tenantId}::uuid AND "caseRef" = ${caseRef} LIMIT 1`
-    );
+    try {
+      return await prisma.case.findFirst({
+        where: { tenantId, caseRef },
+        include: { assignedReviewer: true, assignedAttorney: true }
+      });
+    } catch (error: any) {
+      const message = error?.message ?? '';
 
-    const rawCase = rows[0];
-    if (!rawCase) return null;
+      if (message.includes('LegalExecutionMode') && message.includes('null')) {
+        const rows = await prisma.$queryRaw<
+          Array<{
+            id: string;
+            tenantId: string;
+            caseRef: string;
+            status: CaseStatus;
+            tierSuggested: TierLevel;
+            tierConfirmed: TierLevel | null;
+            assignedReviewerId: string | null;
+            assignedAttorneyId: string | null;
+            legalExecutionMode: LegalExecutionMode | null;
+            expectedPayoutWindow: string | null;
+            closureConfirmationRequired: boolean;
+            metadata: Record<string, unknown> | null;
+            createdAt: Date;
+            updatedAt: Date;
+          }>
+        >(
+          Prisma.sql`SELECT * FROM "Case" WHERE "tenantId" = ${tenantId}::uuid AND "caseRef" = ${caseRef} LIMIT 1`
+        );
 
-    const [assignedReviewer, assignedAttorney] = await Promise.all([
-      rawCase.assignedReviewerId
-        ? prisma.user.findUnique({ where: { id: rawCase.assignedReviewerId } })
-        : Promise.resolve(null),
-      rawCase.assignedAttorneyId
-        ? prisma.attorney.findUnique({ where: { id: rawCase.assignedAttorneyId } })
-        : Promise.resolve(null)
-    ]);
+        const rawCase = rows[0];
+        if (!rawCase) return null;
 
-    return { ...rawCase, assignedReviewer, assignedAttorney } as any;
+        const [assignedReviewer, assignedAttorney] = await Promise.all([
+          rawCase.assignedReviewerId
+            ? prisma.user.findUnique({ where: { id: rawCase.assignedReviewerId } })
+            : Promise.resolve(null),
+          rawCase.assignedAttorneyId
+            ? prisma.attorney.findUnique({ where: { id: rawCase.assignedAttorneyId } })
+            : Promise.resolve(null)
+        ]);
+
+        return { ...rawCase, assignedReviewer, assignedAttorney } as any;
+      }
+
+      throw error;
+    }
   }
 
   async listCases(tenantId: string, params: ListCasesParams) {

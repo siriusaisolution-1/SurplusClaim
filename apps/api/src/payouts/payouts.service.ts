@@ -7,7 +7,6 @@ import { CaseStatus, Prisma } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { CasesService } from '../cases/cases.service';
-import { findCaseByRefRaw } from '../prisma/case-lookup';
 import { prisma } from '../prisma/prisma.client';
 import { FeeCalculatorService } from './fee-calculator.service';
 import { assertPayoutConfirmable } from './payout-confirmation.guard';
@@ -66,7 +65,7 @@ export class PayoutsService {
   }
 
   private async findCaseOrThrow(tenantId: string, caseRef: string) {
-    const caseRecord = await findCaseByRefRaw(tenantId, caseRef);
+    const caseRecord = await prisma.case.findFirst({ where: { tenantId, caseRef } });
     if (!caseRecord) {
       throw new NotFoundException('Case not found');
     }

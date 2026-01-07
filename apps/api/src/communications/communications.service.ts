@@ -4,7 +4,6 @@ import { templateRegistry, TemplateDefinition } from '@surplus/shared';
 import { CommunicationChannel as PrismaChannel, CommunicationDirection, TierLevel } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
-import { findCaseByRefRaw } from '../prisma/case-lookup';
 import { prisma } from '../prisma/prisma.client';
 import { LegalSafetyService } from '../safety/legal-safety.service';
 
@@ -134,7 +133,14 @@ export class CommunicationsService {
   }
 
   private async loadCaseContext(tenantId: string, caseRef: string) {
-    const record = await findCaseByRefRaw(tenantId, caseRef);
+    const record = await prisma.case.findFirst({
+      where: { tenantId, caseRef },
+      select: {
+        id: true,
+        tierConfirmed: true,
+        tierSuggested: true
+      }
+    });
 
     if (!record) {
       throw new NotFoundException('Case not found');

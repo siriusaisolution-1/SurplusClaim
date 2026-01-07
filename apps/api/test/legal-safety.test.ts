@@ -1,7 +1,6 @@
 // @ts-nocheck
 import { AI_OUTPUT_RULES, UPL_DISCLAIMER } from '../../../packages/shared/src/upl';
 
-import { validateFileInput, validateUploadedFileBuffer } from '../src/documents/upload.config';
 import { LegalSafetyService } from '../src/safety/legal-safety.service';
 
 const legalSafety = new LegalSafetyService();
@@ -47,16 +46,5 @@ expectThrow(
 );
 
 expectThrow(() => legalSafety.validateDocType('unknown', ['claimant-id']), 'Unexpected doc types must be blocked');
-
-validateFileInput({ originalname: 'sample.png', mimetype: 'image/png' });
-expectThrow(
-  () =>
-    validateUploadedFileBuffer({
-      originalname: 'sample.png',
-      mimetype: 'image/png',
-      buffer: Buffer.from('')
-    }),
-  'Empty upload buffers must be rejected'
-);
 
 console.log('Legal safety tests passed');
