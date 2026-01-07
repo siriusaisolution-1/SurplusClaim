@@ -98,9 +98,13 @@ async function main() {
 
   await transition(CaseStatus.DOCUMENT_COLLECTION);
 
+  const tinyPng = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMBAF1oUO4AAAAASUVORK5CYII=',
+    'base64'
+  );
   const documentUpload = await authed(server, token)
     .post(`/cases/${caseRef}/documents/upload`)
-    .attach('file', Buffer.from('mock-document'), 'id-proof.pdf')
+    .attach('file', tinyPng, { filename: 'id-proof.png', contentType: 'image/png' })
     .field('docType', 'id_proof')
     .expect(201);
   assert.ok(documentUpload.body.document.id, 'document should be stored');
