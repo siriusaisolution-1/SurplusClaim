@@ -13,6 +13,9 @@ const CHECKSUM_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
 const CASE_REF_REGEX = /^TS-([A-Z]{2})-([A-Z0-9]{3,8})-(\d{8})-([A-Z0-9]{6})-([A-Z0-9])$/;
 const CASE_REF_SEARCH_REGEX = /TS-[A-Z]{2}-[A-Z0-9]{3,8}-\d{8}-[A-Z0-9]{6}-[A-Z0-9]/gi;
+const COUNTER_BASE = 36;
+const COUNTER_WIDTH = 2;
+const COUNTER_MODULO = COUNTER_BASE ** COUNTER_WIDTH;
 
 function toYyyyMmDd(date: string | Date): string {
   const d = typeof date === 'string' ? new Date(date) : date;
@@ -36,6 +39,22 @@ function randomBlock(length: number): string {
   }
 
   return output;
+}
+
+let lastTimestamp = 0;
+let counter = 0;
+
+function uniqueRandomBlock(): string {
+  const timestamp = Date.now();
+  if (timestamp === lastTimestamp) {
+    counter = (counter + 1) % COUNTER_MODULO;
+  } else {
+    lastTimestamp = timestamp;
+    counter = 0;
+  }
+
+  const counterSuffix = counter.toString(COUNTER_BASE).toUpperCase().padStart(COUNTER_WIDTH, '0');
+  return `${randomBlock(4)}${counterSuffix}`;
 }
 
 function charToValue(char: string): number {
@@ -70,7 +89,7 @@ export function generateCaseRef(params: {
   const state = params.state.toUpperCase();
   const countycode = params.countycode.toUpperCase();
   const date = toYyyyMmDd(params.date);
-  const random = randomBlock(6);
+  const random = uniqueRandomBlock();
   const base = `TS-${state}-${countycode}-${date}-${random}`;
   const checkDigit = computeCheckDigit(base);
 
