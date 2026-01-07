@@ -1,18 +1,19 @@
 import { Body, Controller, Get, Param, Post, UploadedFile, UseInterceptors, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import type { Request } from 'express';
-import multer, { type FileFilterCallback, type Options as MulterOptions } from 'multer';
+import multer, { type Options as MulterOptions } from 'multer';
 
 import { CurrentUser, Roles } from '../auth/auth.decorators';
 import { DocumentStatus, DocumentsService } from './documents.service';
 import { MAX_UPLOAD_BYTES, validateFileInput } from './upload.config';
 
-const fileFilter = (_req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
+type MulterFileFilterCallback = (error: Error | null, acceptFile: boolean) => void;
+
+const fileFilter = (_req: any, file: Express.Multer.File, cb: MulterFileFilterCallback) => {
   try {
     validateFileInput(file);
     cb(null, true);
   } catch (error) {
-    cb(error as Error);
+    cb(error as Error, false);
   }
 };
 
