@@ -1,5 +1,5 @@
 import { Body, Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
-import { CaseStatus } from '@prisma/client';
+import { CaseStatus, LegalExecutionMode, TierLevel } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { CurrentUser, Roles } from '../auth/auth.decorators';
@@ -10,6 +10,22 @@ import {
   CreateCaseInput,
   TriageSuggestInput
 } from './cases.service';
+
+type CaseListItem = {
+  id: string;
+  caseRef: string;
+  status: CaseStatus;
+  tierSuggested: TierLevel | null;
+  tierConfirmed: TierLevel | null;
+  assignedReviewer: { id: string; email: string } | null;
+  assignedAttorney: { id: string; fullName: string; email: string } | null;
+  legalExecutionMode: LegalExecutionMode | null;
+  expectedPayoutWindow: string | null;
+  closureConfirmationRequired: boolean;
+  metadata: Record<string, unknown> | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 @Controller('cases')
 export class CasesController {
@@ -34,11 +50,13 @@ export class CasesController {
       pageSize: pageSize ? parseInt(pageSize, 10) : undefined
     });
 
+    const caseItems = response.data as CaseListItem[];
+
     return {
       total: response.total,
       page: response.page,
       pageSize: response.pageSize,
-      cases: response.data.map((item) => ({
+      cases: caseItems.map((item) => ({
         id: item.id,
         caseRef: item.caseRef,
         status: item.status,
