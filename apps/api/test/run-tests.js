@@ -61,6 +61,7 @@ function canReach(host, port) {
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/fee-calculator.test.ts');
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/case-transition-guard.test.ts');
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/integration.test.ts');
+    run('pnpm exec ts-node --project ./tsconfig.test.json ./test/e2e/happy-path.test.ts');
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exit(1);
