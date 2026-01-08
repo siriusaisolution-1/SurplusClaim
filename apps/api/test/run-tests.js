@@ -48,7 +48,13 @@ function canReach(host, port) {
     const reachable = await canReach(url.hostname, port);
 
     if (!reachable) {
-      console.warn(`Skipping DB-dependent tests (database unreachable at ${url.hostname}:${port})`);
+      const message = `Database unreachable at ${url.hostname}:${port}`;
+      if (process.env.CI === 'true') {
+        console.error(`${message}; failing because CI=true`);
+        process.exit(1);
+      }
+
+      console.warn(`Skipping DB-dependent tests (${message})`);
       return;
     }
 
@@ -61,6 +67,7 @@ function canReach(host, port) {
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/fee-calculator.test.ts');
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/case-transition-guard.test.ts');
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/integration.test.ts');
+    run('pnpm exec ts-node --project ./tsconfig.test.json ./test/e2e-happy-path.test.ts');
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exit(1);
