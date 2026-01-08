@@ -81,7 +81,7 @@ async function main() {
     );
   } finally {
     await prisma.$executeRawUnsafe(
-      `UPDATE "Case" SET "legalExecutionMode" = 'ATTORNEY_REQUIRED' WHERE "legalExecutionMode" IS NULL;`
+      `UPDATE "Case" SET "legalExecutionMode" = 'OPS_DIRECT' WHERE "legalExecutionMode" IS NULL;`
     );
     if (droppedNotNull) {
       await prisma.$executeRawUnsafe('ALTER TABLE "Case" ALTER COLUMN "legalExecutionMode" SET NOT NULL;');
