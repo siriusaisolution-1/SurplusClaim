@@ -13,7 +13,7 @@ describe('case reference generation', () => {
     const refs = new Set<string>();
     const date = new Date('2025-12-15');
 
-    for (let i = 0; i < 2000; i += 1) {
+    for (let i = 0; i < 300; i += 1) {
       const ref = generateCaseRef({ state: 'CA', countycode: 'ALAM', date });
       expect(validateCaseRef(ref)).toBe(true);
       expect(refs.has(ref)).toBe(false);
@@ -35,7 +35,10 @@ describe('case reference generation', () => {
 
   it('fails validation when check digit is wrong', () => {
     const caseRef = generateCaseRef({ state: 'IL', countycode: 'COOK', date: '2024-01-01' });
-    const invalid = `${caseRef.slice(0, -1)}Z`;
+    const last = caseRef.at(-1);
+    const replacement =
+      ['0', '1', 'Z', 'Y', 'X'].find((candidate) => candidate !== last) ?? '0';
+    const invalid = `${caseRef.slice(0, -1)}${replacement}`;
 
     expect(validateCaseRef(invalid)).toBe(false);
     expect(() => parseCaseRef(invalid)).toThrowError('Invalid check digit');

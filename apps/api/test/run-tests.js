@@ -3,8 +3,6 @@ const net = require('net');
 
 const dbUrl = process.env.DATABASE_URL ?? 'postgresql://surplus:surplus@localhost:5432/surplus';
 process.env.DATABASE_URL = dbUrl;
-const skipPrismaSetup = process.env.SKIP_PRISMA_DB_SETUP === 'true';
-
 const baseEnv = {
   ...process.env,
   TS_NODE_PROJECT: './tsconfig.test.json'
@@ -12,6 +10,10 @@ const baseEnv = {
 
 function run(cmd) {
   execSync(cmd, { stdio: 'inherit', env: baseEnv });
+}
+
+function runWithInput(cmd, input) {
+  execSync(cmd, { stdio: ['pipe', 'inherit', 'inherit'], env: baseEnv, input });
 }
 
 function canReach(host, port) {
@@ -35,11 +37,7 @@ function canReach(host, port) {
 
 (async () => {
   try {
-    if (!skipPrismaSetup) {
-      run('pnpm exec prisma generate --schema ./prisma/schema.prisma');
-    } else {
-      console.log('Skipping Prisma client generation (SKIP_PRISMA_DB_SETUP=true)');
-    }
+    run('pnpm exec prisma generate --schema ./prisma/schema.prisma');
 
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/legal-safety.test.ts');
 
@@ -52,15 +50,16 @@ function canReach(host, port) {
       return;
     }
 
-    if (!skipPrismaSetup) {
-      run('pnpm exec prisma migrate deploy --schema ./prisma/schema.prisma');
-    } else {
-      console.log('Skipping Prisma migrate deploy (SKIP_PRISMA_DB_SETUP=true)');
-    }
+    run('pnpm exec prisma migrate deploy --schema ./prisma/schema.prisma');
+    runWithInput(
+      `pnpm exec prisma db execute --schema ./prisma/schema.prisma --url "${dbUrl}" --stdin`,
+      'UPDATE "Case" SET "legalExecutionMode" = \'ATTORNEY_REQUIRED\' WHERE "legalExecutionMode" IS NULL;'
+    );
 
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/fee-calculator.test.ts');
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/case-transition-guard.test.ts');
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/integration.test.ts');
+    run('pnpm exec ts-node --project ./tsconfig.test.json ./test/e2e/happy-path.test.ts');
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exit(1);
