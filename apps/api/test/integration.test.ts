@@ -110,7 +110,8 @@ async function main() {
     .set('Authorization', `Bearer ${accessToken}`)
     .expect(200);
 
-  assert.strictEqual(caseResponse.body.caseRef, seed.caseA.caseRef);
+  assert.ok(caseResponse.body?.case);
+  assert.strictEqual(caseResponse.body.case?.caseRef, seed.caseA.caseRef);
 
   await request(server)
     .get('/cases/CASE-B-001')
