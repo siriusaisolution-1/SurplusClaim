@@ -55,33 +55,38 @@ async function main() {
     (error) => error instanceof BadRequestException
   );
 
-  await prisma.$executeRawUnsafe('ALTER TABLE "Case" ALTER COLUMN "legalExecutionMode" DROP NOT NULL;');
-  const caseWithoutLegalExecution = await prisma.case.create({
-    data: {
-      tenantId: tenant.id,
-      caseRef: 'CASE-GUARD-NO-LEGAL',
-      status: CaseStatus.SUBMITTED,
-      tierSuggested: TierLevel.LOW,
-      legalExecutionMode: LegalExecutionMode.OPS_DIRECT
+  let droppedNotNull = false;
+  try {
+    await prisma.$executeRawUnsafe('ALTER TABLE "Case" ALTER COLUMN "legalExecutionMode" DROP NOT NULL;');
+    droppedNotNull = true;
+    const caseWithoutLegalExecution = await prisma.case.create({
+      data: {
+        tenantId: tenant.id,
+        caseRef: 'CASE-GUARD-NO-LEGAL',
+        status: CaseStatus.SUBMITTED,
+        tierSuggested: TierLevel.LOW,
+        legalExecutionMode: LegalExecutionMode.OPS_DIRECT
+      }
+    });
+    await prisma.$executeRawUnsafe(
+      `UPDATE "Case" SET "legalExecutionMode" = NULL WHERE "id" = '${caseWithoutLegalExecution.id}';`
+    );
+
+    await assert.rejects(
+      () =>
+        casesService.transitionCase(tenant.id, actor.id, caseWithoutLegalExecution.caseRef, {
+          toState: CaseStatus.PAYOUT_CONFIRMED
+        }),
+      (error) => error instanceof BadRequestException
+    );
+  } finally {
+    await prisma.$executeRawUnsafe(
+      `UPDATE "Case" SET "legalExecutionMode" = 'OPS_DIRECT' WHERE "legalExecutionMode" IS NULL;`
+    );
+    if (droppedNotNull) {
+      await prisma.$executeRawUnsafe('ALTER TABLE "Case" ALTER COLUMN "legalExecutionMode" SET NOT NULL;');
     }
-  });
-  await prisma.$executeRawUnsafe(
-    `UPDATE "Case" SET "legalExecutionMode" = NULL WHERE "id" = '${caseWithoutLegalExecution.id}';`
-  );
-
-  await assert.rejects(
-    () =>
-      casesService.transitionCase(tenant.id, actor.id, caseWithoutLegalExecution.caseRef, {
-        toState: CaseStatus.PAYOUT_CONFIRMED
-      }),
-    (error) => error instanceof BadRequestException
-  );
-
-  await prisma.case.update({
-    where: { id: caseWithoutLegalExecution.id },
-    data: { legalExecutionMode: LegalExecutionMode.OPS_DIRECT }
-  });
-  await prisma.$executeRawUnsafe('ALTER TABLE "Case" ALTER COLUMN "legalExecutionMode" SET NOT NULL;');
+  }
 
   const caseWithoutEvidence = await prisma.case.create({
     data: {

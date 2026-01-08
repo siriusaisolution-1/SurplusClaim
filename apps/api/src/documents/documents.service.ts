@@ -275,7 +275,6 @@ export class DocumentsService {
       }
     });
 
-    const caseRecord = await this.findCaseOrThrow(params.tenantId, params.caseRef);
     const checklist = await this.buildChecklistProgress(caseRecord);
     return { document: updated, checklist };
   }

@@ -18,6 +18,7 @@ declare module '@surplus/shared' {
   export type TemplateDefinition = import('../../../packages/shared/src/communications/templates').TemplateDefinition;
   export { templateRegistry } from '../../../packages/shared/src/communications/templates';
   export { generateCaseRef } from '../../../packages/shared/src/caseRef';
+  export { validateCaseRef } from '../../../packages/shared/src/caseRef';
 }
 
 declare module '@surplus/connectors' {
