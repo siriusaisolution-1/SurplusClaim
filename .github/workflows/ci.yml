@@ -10,6 +10,7 @@ on:
 jobs:
   build-and-verify:
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:15
@@ -24,6 +25,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
     env:
       DATABASE_URL: postgresql://surplus:surplus@localhost:5432/surplus
       JWT_ACCESS_SECRET: test-secret
@@ -59,6 +61,11 @@ jobs:
         working-directory: apps/api
         run: pnpm exec prisma migrate deploy --schema prisma/schema.prisma
 
+      # P1 hardening: fail if schema.prisma != migrations (prevents future drift)
+      - name: Prisma schema vs migrations diff
+        working-directory: apps/api
+        run: pnpm exec prisma migrate diff --from-schema-datamodel=./prisma/schema.prisma --to-migrations=./prisma/migrations --exit-code
+
       - name: Typecheck
         run: |
           pnpm exec tsc -p apps/api/tsconfig.json --noEmit
@@ -68,6 +75,7 @@ jobs:
       - name: Tests
         env:
           SKIP_PRISMA_DB_SETUP: "true"
+          RUN_API_INTEGRATION: "true"
         run: pnpm test
 
       - name: Build
