@@ -121,7 +121,10 @@ export class DocumentsService {
 
     const completedItems = checklist.items.map((item) => {
       if (item.type === 'document') {
-        return { ...item, completed: docs.some((doc) => this.documentMatches(doc, item.id) && doc.status !== 'REJECTED') };
+        return {
+          ...item,
+          completed: docs.some((doc) => this.documentMatches(doc, item.id) && doc.status !== 'REJECTED')
+        };
       }
       return { ...item, completed: false };
     });
@@ -229,6 +232,7 @@ export class DocumentsService {
       throw new NotFoundException('Document not found');
     }
 
+    // ✅ defined once
     const caseRecord = await this.findCaseOrThrow(params.tenantId, params.caseRef);
     const allowedDocTypes = this.getAllowedDocTypes(caseRecord);
     const updatedDocType = params.docType
@@ -275,7 +279,7 @@ export class DocumentsService {
       }
     });
 
-    const caseRecord = await this.findCaseOrThrow(params.tenantId, params.caseRef);
+    // ✅ reuse existing caseRecord (no redeclare)
     const checklist = await this.buildChecklistProgress(caseRecord);
     return { document: updated, checklist };
   }
