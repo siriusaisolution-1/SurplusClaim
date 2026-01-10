@@ -1,10 +1,24 @@
 import { Body, Controller, Get, Param, Post, UploadedFile, UseInterceptors, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import multer, { type Options as MulterOptions } from 'multer';
+import type { Request } from 'express';
+import multer, { type FileFilterCallback, type Options as MulterOptions } from 'multer';
 
 import { CurrentUser, Roles } from '../auth/auth.decorators';
 import { DocumentStatus, DocumentsService } from './documents.service';
-import { MAX_UPLOAD_BYTES, uploadFileFilter } from './upload.config';
+import { MAX_UPLOAD_BYTES, validateFileInput } from './upload.config';
+
+const fileFilter = (_req: Request, file: Express.Multer.File, callback: FileFilterCallback) => {
+  try {
+    validateFileInput(file);
+    (callback as () => void)();
+  } catch (error) {
+    if (error instanceof BadRequestException) {
+      callback(error);
+      return;
+    }
+    callback(new BadRequestException('Invalid file upload'));
+  }
+};
 
 @Controller('cases/:caseRef/documents')
 export class DocumentsController {
@@ -22,7 +36,7 @@ export class DocumentsController {
     FileInterceptor('file', {
       storage: multer.memoryStorage(),
       limits: { fileSize: MAX_UPLOAD_BYTES },
-      fileFilter: uploadFileFilter
+      fileFilter
     } satisfies MulterOptions)
   )
   async upload(

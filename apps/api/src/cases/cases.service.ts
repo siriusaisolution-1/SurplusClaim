@@ -341,6 +341,9 @@ export class CasesService {
 
   async findByCaseRef(tenantId: string, caseRef: string) {
     try {
+      await prisma.$executeRaw(
+        Prisma.sql`UPDATE "Case" SET "legalExecutionMode" = 'ATTORNEY_REQUIRED' WHERE "tenantId" = ${tenantId}::uuid AND "caseRef" = ${caseRef} AND "legalExecutionMode" IS NULL`
+      );
       return await prisma.case.findFirst({
         where: { tenantId, caseRef },
         include: { assignedReviewer: true, assignedAttorney: true }
@@ -446,6 +449,7 @@ export class CasesService {
       );
     }
 
+    const legalExecutionMode = input.legalExecutionMode ?? LegalExecutionMode.ATTORNEY_REQUIRED;
     const createdCase = await prisma.$transaction(async (tx) => {
       const caseRecord = await tx.case.create({
         data: {
@@ -455,7 +459,7 @@ export class CasesService {
           tierSuggested,
           assignedReviewerId: input.assignedReviewerId ?? null,
           assignedAttorneyId: input.assignedAttorneyId ?? null,
-          legalExecutionMode: input.legalExecutionMode ?? LegalExecutionMode.ATTORNEY_REQUIRED,
+          legalExecutionMode,
           expectedPayoutWindow: input.expectedPayoutWindow ?? null,
           closureConfirmationRequired: input.closureConfirmationRequired ?? false,
           metadata: input.metadata ?? null
@@ -472,7 +476,7 @@ export class CasesService {
             tierSuggested,
             assignedReviewerId: input.assignedReviewerId ?? null,
             assignedAttorneyId: input.assignedAttorneyId ?? null,
-            legalExecutionMode: input.legalExecutionMode ?? LegalExecutionMode.ATTORNEY_REQUIRED,
+            legalExecutionMode,
             expectedPayoutWindow: input.expectedPayoutWindow ?? null,
             closureConfirmationRequired: input.closureConfirmationRequired ?? false,
             metadata: input.metadata ?? {}
@@ -493,7 +497,7 @@ export class CasesService {
         tierSuggested,
         assignedReviewerId: input.assignedReviewerId ?? null,
         assignedAttorneyId: input.assignedAttorneyId ?? null,
-        legalExecutionMode: input.legalExecutionMode ?? LegalExecutionMode.ATTORNEY_REQUIRED,
+        legalExecutionMode,
         expectedPayoutWindow: input.expectedPayoutWindow ?? null,
         closureConfirmationRequired: input.closureConfirmationRequired ?? false
       }
