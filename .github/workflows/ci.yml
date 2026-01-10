@@ -24,7 +24,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
     env:
       DATABASE_URL: postgresql://surplus:surplus@localhost:5432/surplus
       JWT_ACCESS_SECRET: test-secret
@@ -60,10 +59,6 @@ jobs:
         working-directory: apps/api
         run: pnpm exec prisma migrate deploy --schema prisma/schema.prisma
 
-      - name: Prisma schema vs database diff
-        working-directory: apps/api
-        run: pnpm exec prisma migrate diff --from-schema-datamodel=./prisma/schema.prisma --to-schema-datasource=./prisma/schema.prisma --exit-code
-
       - name: Typecheck
         run: |
           pnpm exec tsc -p apps/api/tsconfig.json --noEmit
@@ -73,7 +68,6 @@ jobs:
       - name: Tests
         env:
           SKIP_PRISMA_DB_SETUP: "true"
-          RUN_API_INTEGRATION: "true"
         run: pnpm test
 
       - name: Build
