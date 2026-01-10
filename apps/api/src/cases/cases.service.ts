@@ -340,53 +340,59 @@ export class CasesService {
   }
 
   async findByCaseRef(tenantId: string, caseRef: string) {
-    try {
-      return await prisma.case.findFirst({
-        where: { tenantId, caseRef },
-        include: { assignedReviewer: true, assignedAttorney: true }
-      });
-    } catch (error: any) {
-      const message = error?.message ?? '';
+    const rows = await prisma.$queryRaw<
+      Array<{
+        id: string;
+        tenantId: string;
+        caseRef: string;
+        status: CaseStatus;
+        tierSuggested: TierLevel;
+        tierConfirmed: TierLevel | null;
+        assignedReviewerId: string | null;
+        assignedAttorneyId: string | null;
+        legalExecutionMode: LegalExecutionMode;
+        expectedPayoutWindow: string | null;
+        closureConfirmationRequired: boolean;
+        metadata: Prisma.JsonValue | null;
+        createdAt: Date;
+        updatedAt: Date;
+      }>
+    >(
+      Prisma.sql`
+        SELECT
+          "id",
+          "tenantId",
+          "caseRef",
+          "status",
+          "tierSuggested",
+          "tierConfirmed",
+          "assignedReviewerId",
+          "assignedAttorneyId",
+          COALESCE("legalExecutionMode", 'ATTORNEY_REQUIRED')::"LegalExecutionMode" AS "legalExecutionMode",
+          "expectedPayoutWindow",
+          "closureConfirmationRequired",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        FROM "Case"
+        WHERE "tenantId" = ${tenantId}::uuid AND "caseRef" = ${caseRef}
+        LIMIT 1
+      `
+    );
 
-      if (message.includes('LegalExecutionMode') && message.includes('null')) {
-        const rows = await prisma.$queryRaw<
-          Array<{
-            id: string;
-            tenantId: string;
-            caseRef: string;
-            status: CaseStatus;
-            tierSuggested: TierLevel;
-            tierConfirmed: TierLevel | null;
-            assignedReviewerId: string | null;
-            assignedAttorneyId: string | null;
-            legalExecutionMode: LegalExecutionMode | null;
-            expectedPayoutWindow: string | null;
-            closureConfirmationRequired: boolean;
-            metadata: Record<string, unknown> | null;
-            createdAt: Date;
-            updatedAt: Date;
-          }>
-        >(
-          Prisma.sql`SELECT * FROM "Case" WHERE "tenantId" = ${tenantId}::uuid AND "caseRef" = ${caseRef} LIMIT 1`
-        );
+    const rawCase = rows[0];
+    if (!rawCase) return null;
 
-        const rawCase = rows[0];
-        if (!rawCase) return null;
+    const [assignedReviewer, assignedAttorney] = await Promise.all([
+      rawCase.assignedReviewerId
+        ? prisma.user.findUnique({ where: { id: rawCase.assignedReviewerId } })
+        : Promise.resolve(null),
+      rawCase.assignedAttorneyId
+        ? prisma.attorney.findUnique({ where: { id: rawCase.assignedAttorneyId } })
+        : Promise.resolve(null)
+    ]);
 
-        const [assignedReviewer, assignedAttorney] = await Promise.all([
-          rawCase.assignedReviewerId
-            ? prisma.user.findUnique({ where: { id: rawCase.assignedReviewerId } })
-            : Promise.resolve(null),
-          rawCase.assignedAttorneyId
-            ? prisma.attorney.findUnique({ where: { id: rawCase.assignedAttorneyId } })
-            : Promise.resolve(null)
-        ]);
-
-        return { ...rawCase, assignedReviewer, assignedAttorney } as any;
-      }
-
-      throw error;
-    }
+    return { ...rawCase, assignedReviewer, assignedAttorney } as any;
   }
 
   async listCases(tenantId: string, params: ListCasesParams) {

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
-import { CaseStatus } from '@prisma/client';
+import { Attorney, Case, CaseStatus, User } from '@prisma/client';
 
 import { AuditService } from '../audit/audit.service';
 import { CurrentUser, Roles } from '../auth/auth.decorators';
@@ -38,7 +38,7 @@ export class CasesController {
       total: response.total,
       page: response.page,
       pageSize: response.pageSize,
-      cases: response.data.map((item) => ({
+      cases: response.data.map((item: Case & { assignedReviewer: User | null; assignedAttorney: Attorney | null }) => ({
         id: item.id,
         caseRef: item.caseRef,
         status: item.status,
