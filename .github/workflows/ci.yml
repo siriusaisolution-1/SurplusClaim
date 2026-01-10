@@ -24,10 +24,30 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
+      # Shadow DB for prisma migrate diff
+      postgres_shadow:
+        image: postgres:15
+        env:
+          POSTGRES_USER: surplus
+          POSTGRES_PASSWORD: surplus
+          POSTGRES_DB: surplus_shadow
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U surplus -d surplus_shadow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       DATABASE_URL: postgresql://surplus:surplus@localhost:5432/surplus
+      SHADOW_DATABASE_URL: postgresql://surplus:surplus@localhost:5433/surplus_shadow
       JWT_ACCESS_SECRET: test-secret
       NODE_ENV: test
+
+      # Keep this false until alignment migration makes drift clean.
+      PRISMA_DRIFT_CHECK: "false"
 
     steps:
       - name: Checkout
@@ -59,6 +79,11 @@ jobs:
         working-directory: apps/api
         run: pnpm exec prisma migrate deploy --schema prisma/schema.prisma
 
+      - name: Prisma schema vs migrations drift check (optional)
+        if: env.PRISMA_DRIFT_CHECK == 'true'
+        working-directory: apps/api
+        run: pnpm exec prisma migrate diff --from-schema-datamodel=./prisma/schema.prisma --to-migrations=./prisma/migrations --shadow-database-url="${SHADOW_DATABASE_URL}" --exit-code
+
       - name: Typecheck
         run: |
           pnpm exec tsc -p apps/api/tsconfig.json --noEmit
@@ -68,6 +93,7 @@ jobs:
       - name: Tests
         env:
           SKIP_PRISMA_DB_SETUP: "true"
+          RUN_API_INTEGRATION: "true"
         run: pnpm test
 
       - name: Build
