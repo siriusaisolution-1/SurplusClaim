@@ -11,6 +11,33 @@ import {
   TriageSuggestInput
 } from './cases.service';
 
+// Minimal types to satisfy noImplicitAny in test tsconfig
+type AssignedUser = { id: string; email: string };
+type AssignedAttorney = { id: string; fullName: string; email: string };
+
+type CaseListItem = {
+  id: string;
+  caseRef: string;
+  status: CaseStatus;
+  tierSuggested?: any;
+  tierConfirmed?: any;
+  assignedReviewer?: AssignedUser | null;
+  assignedAttorney?: AssignedAttorney | null;
+  legalExecutionMode?: any;
+  expectedPayoutWindow?: any;
+  closureConfirmationRequired?: boolean;
+  metadata?: any;
+  createdAt: any;
+  updatedAt: any;
+};
+
+type ListCasesResponse = {
+  total: number;
+  page: number;
+  pageSize: number;
+  data: CaseListItem[];
+};
+
 @Controller('cases')
 export class CasesController {
   constructor(private casesService: CasesService, private auditService: AuditService) {}
@@ -26,19 +53,20 @@ export class CasesController {
     @Query('pageSize') pageSize?: string
   ) {
     const parsedStatus = status && Object.values(CaseStatus).includes(status) ? status : undefined;
-    const response: any = await this.casesService.listCases(user.tenantId, {
+
+    const response = (await this.casesService.listCases(user.tenantId, {
       status: parsedStatus,
       search,
       needsTriage: needsTriage === 'true',
       page: page ? parseInt(page, 10) : undefined,
       pageSize: pageSize ? parseInt(pageSize, 10) : undefined
-    });
+    })) as unknown as ListCasesResponse;
 
     return {
       total: response.total,
       page: response.page,
       pageSize: response.pageSize,
-      cases: response.data.map((item) => ({
+      cases: response.data.map((item: CaseListItem) => ({
         id: item.id,
         caseRef: item.caseRef,
         status: item.status,
