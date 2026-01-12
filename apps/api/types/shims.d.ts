@@ -17,6 +17,7 @@ declare module '@surplus/shared' {
   export type NormalizedCase = import('../../../packages/shared/src/schemas').NormalizedCase;
   export type TemplateDefinition = import('../../../packages/shared/src/communications/templates').TemplateDefinition;
   export { templateRegistry } from '../../../packages/shared/src/communications/templates';
+  export { validateCaseRef } from '../../../packages/shared/src/caseRef';
   export { generateCaseRef } from '../../../packages/shared/src/caseRef';
 }
 
