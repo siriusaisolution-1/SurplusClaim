@@ -8,7 +8,9 @@ export class RulesService {
   private checklist = new ChecklistGenerator(this.registry);
 
   listJurisdictions() {
-    return this.registry.listJurisdictions().filter((jurisdiction) => jurisdiction.enabled);
+    return this.registry
+      .listJurisdictions()
+      .filter((jurisdiction: { enabled: boolean }) => jurisdiction.enabled);
   }
 
   getRule(state: string, countyCode: string) {

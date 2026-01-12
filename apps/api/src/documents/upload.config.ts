@@ -2,13 +2,20 @@ import path from 'node:path';
 
 import { BadRequestException } from '@nestjs/common';
 import type { Request } from 'express';
-import type { Options as MulterOptions } from 'multer';
+import type { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
 
 export const MAX_UPLOAD_BYTES = parseInt(process.env.MAX_UPLOAD_BYTES ?? '5242880', 10); // 5 MiB default
 export const ALLOWED_MIME_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
 const ALLOWED_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg'];
 
-export function validateFileInput(file: Express.Multer.File | undefined) {
+type UploadFile = {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer?: Buffer;
+};
+
+export function validateFileInput(file: UploadFile | undefined) {
   if (!file) {
     throw new BadRequestException('No file provided');
   }
@@ -32,6 +39,6 @@ export const uploadFileFilter: MulterFileFilter = (_req: Request, file, cb) => {
     validateFileInput(file);
     cb(null, true);
   } catch (error) {
-    cb(error as Error);
+    cb(error as Error, false);
   }
 };
