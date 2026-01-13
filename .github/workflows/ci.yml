@@ -47,7 +47,7 @@ jobs:
       NODE_ENV: test
 
       # Keep this false until alignment migration makes drift clean.
-      PRISMA_DRIFT_CHECK: "false"
+      PRISMA_DRIFT_CHECK: "true"
 
     steps:
       - name: Checkout
