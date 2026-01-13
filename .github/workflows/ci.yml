@@ -85,10 +85,6 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Prisma generate
-        working-directory: apps/api
-        run: pnpm exec prisma generate --schema prisma/schema.prisma
-
       - name: Prisma migrate deploy
         working-directory: apps/api
         run: pnpm exec prisma migrate deploy --schema prisma/schema.prisma
