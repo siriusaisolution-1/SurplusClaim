@@ -82,7 +82,14 @@ jobs:
       - name: Prisma schema vs migrations drift check (optional)
         if: env.PRISMA_DRIFT_CHECK == 'true'
         working-directory: apps/api
-        run: pnpm exec prisma migrate diff --from-schema-datamodel=./prisma/schema.prisma --to-migrations=./prisma/migrations --shadow-database-url="${SHADOW_DATABASE_URL}" --exit-code
+        run: |
+          echo "Prisma drift check enabled; comparing prisma/schema.prisma to prisma/migrations using SHADOW_DATABASE_URL."
+          if pnpm exec prisma migrate diff --from-schema-datamodel=./prisma/schema.prisma --to-migrations=./prisma/migrations --shadow-database-url="${SHADOW_DATABASE_URL}" --exit-code; then
+            echo "Prisma schema matches migrations."
+          else
+            echo "Prisma drift detected. Review prisma/schema.prisma and prisma/migrations, then create or adjust migrations."
+            exit 1
+          fi
 
       - name: Typecheck
         run: |
