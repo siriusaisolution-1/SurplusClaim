@@ -43,7 +43,8 @@ function canReach(host, port) {
 
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/legal-safety.test.ts');
 
-    const url = new URL(dbUrl.replace(/^postgresql/, 'postgres'));
+    const normalizedDbUrl = dbUrl.replace(/^postgres(ql)?:\/\//, 'postgres://');
+    const url = new URL(normalizedDbUrl);
     const port = url.port ? Number(url.port) : 5432;
     const reachable = await canReach(url.hostname, port);
     const isCi = process.env.CI === 'true';
