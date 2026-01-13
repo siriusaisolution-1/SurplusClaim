@@ -56,10 +56,10 @@ enum LegalExecutionMode {
 }
 
 model Tenant {
-  id          String   @id @default(uuid()) @db.Uuid
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name        String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @db.Timestamptz
+  updatedAt   DateTime @updatedAt @db.Timestamptz
 
   users           User[]
   cases           Case[]
@@ -79,26 +79,27 @@ model Tenant {
 }
 
 model User {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId  String   @db.Uuid
   email     String
   fullName  String
-  passwordHash String
+  passwordHash String @default("")
   role      UserRole
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   casesAssigned Case[] @relation("CaseReviewer")
   auditEntries  AuditLog[] @relation("AuditActor")
   sessions Session[]
+  payoutsConfirmed Payout[] @relation("PayoutConfirmedBy")
 
-  @@unique([tenantId, email])
-  @@index([tenantId, role])
+  @@unique([tenantId, email], map: "user_tenant_email_unique")
+  @@index([tenantId, role], map: "user_tenant_role_idx")
 }
 
 model Case {
-  id                 String    @id @default(uuid()) @db.Uuid
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId           String    @db.Uuid
   caseRef            String
   status             CaseStatus
@@ -110,12 +111,12 @@ model Case {
   expectedPayoutWindow String?
   closureConfirmationRequired Boolean @default(false)
   metadata           Json?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  createdAt          DateTime  @default(now()) @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @db.Timestamptz
 
-  tenant           Tenant @relation(fields: [tenantId], references: [id])
-  assignedReviewer User?  @relation("CaseReviewer", fields: [assignedReviewerId], references: [id])
-  assignedAttorney Attorney? @relation("CaseAttorney", fields: [assignedAttorneyId], references: [id])
+  tenant           Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  assignedReviewer User?  @relation("CaseReviewer", fields: [assignedReviewerId], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "case_assigned_reviewer_fk")
+  assignedAttorney Attorney? @relation("CaseAttorney", fields: [assignedAttorneyId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   events           CaseEvent[]
   artifacts        Artifact[]
   documents        Document[]
@@ -125,47 +126,47 @@ model Case {
   invoices         Invoice[]
   auditTrail       AuditLog[]
 
-  @@unique([tenantId, caseRef])
-  @@index([tenantId, status])
-  @@index([tenantId, caseRef])
-  @@index([tenantId, assignedAttorneyId])
+  @@unique([tenantId, caseRef], map: "case_tenant_ref_unique")
+  @@index([tenantId, status], map: "case_tenant_status_idx")
+  @@index([tenantId, caseRef], map: "case_tenant_ref_idx")
+  @@index([tenantId, assignedAttorneyId], map: "Case_tenantId_assignedAttorneyId_idx")
 }
 
 model Attorney {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId  String   @db.Uuid
   fullName  String
   email     String?
   phone     String?
   barNumber String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   cases  Case[] @relation("CaseAttorney")
 
-  @@unique([tenantId, email])
-  @@index([tenantId, barNumber])
+  @@unique([tenantId, email], map: "Attorney_tenantId_email_key")
+  @@index([tenantId, barNumber], map: "Attorney_tenantId_barNumber_idx")
 }
 
 model CaseEvent {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId  String   @db.Uuid
   caseId    String   @db.Uuid
   caseRef   String
   type      String
   payload   Json
-  createdAt DateTime @default(now())
-  processedAt DateTime?
+  createdAt DateTime @default(now()) @db.Timestamptz
+  processedAt DateTime? @db.Timestamptz
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  case   Case   @relation(fields: [caseId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  case   Case   @relation(fields: [caseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@index([tenantId, caseRef])
+  @@index([tenantId, caseRef], map: "case_event_tenant_ref_idx")
 }
 
 model AuditLog {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId  String   @db.Uuid
   caseId    String?  @db.Uuid
   caseRef   String
@@ -174,36 +175,36 @@ model AuditLog {
   metadata  Json?
   hash      String
   prevHash  String?
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  case   Case?  @relation(fields: [caseId], references: [id])
-  actor  User?  @relation("AuditActor", fields: [actorId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  case   Case?  @relation(fields: [caseId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  actor  User?  @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
-  @@unique([tenantId, hash])
-  @@index([tenantId, caseRef])
+  @@unique([tenantId, hash], map: "audit_hash_unique")
+  @@index([tenantId, caseRef], map: "audit_tenant_ref_idx")
 }
 
 model Artifact {
-  id         String   @id @default(uuid()) @db.Uuid
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId   String   @db.Uuid
   caseId     String   @db.Uuid
   caseRef    String
   objectKey  String
   sha256     String
   source     String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime @default(now()) @db.Timestamptz
 
-  tenant  Tenant  @relation(fields: [tenantId], references: [id])
-  case    Case    @relation(fields: [caseId], references: [id])
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  case    Case    @relation(fields: [caseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   consent Consent? @relation("ConsentArtifact")
 
-  @@index([tenantId, caseRef])
-  @@unique([tenantId, objectKey])
+  @@index([tenantId, caseRef], map: "artifact_tenant_ref_idx")
+  @@unique([tenantId, objectKey], map: "artifact_object_unique")
 }
 
 model Document {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId  String   @db.Uuid
   caseId    String   @db.Uuid
   caseRef   String
@@ -215,15 +216,15 @@ model Document {
   aiConfidence Float?
   status    DocumentStatus @default(PENDING)
   reviewerId String?  @db.Uuid
-  reviewedAt DateTime?
+  reviewedAt DateTime? @db.Timestamptz
   reviewNote String?
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  case   Case   @relation(fields: [caseId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  case   Case   @relation(fields: [caseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@index([tenantId, caseRef])
-  @@unique([tenantId, objectKey])
+  @@index([tenantId, caseRef], map: "document_tenant_ref_idx")
+  @@unique([tenantId, objectKey], map: "document_object_unique")
 }
 
 enum DocumentStatus {
@@ -233,24 +234,24 @@ enum DocumentStatus {
 }
 
 model Consent {
-  id                 String    @id @default(uuid()) @db.Uuid
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId           String    @db.Uuid
   caseId             String    @db.Uuid
   caseRef            String
   consentVersion     String
   consentArtifactId  String?   @unique @db.Uuid
-  signedAt           DateTime
-  revokedAt          DateTime?
+  signedAt           DateTime @db.Timestamptz
+  revokedAt          DateTime? @db.Timestamptz
 
-  tenant   Tenant   @relation(fields: [tenantId], references: [id])
-  case     Case     @relation(fields: [caseId], references: [id])
-  artifact Artifact? @relation("ConsentArtifact", fields: [consentArtifactId], references: [id])
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  case     Case     @relation(fields: [caseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  artifact Artifact? @relation("ConsentArtifact", fields: [consentArtifactId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
-  @@index([tenantId, caseRef])
+  @@index([tenantId, caseRef], map: "consent_tenant_ref_idx")
 }
 
 model Communication {
-  id          String                  @id @default(uuid()) @db.Uuid
+  id          String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId    String                  @db.Uuid
   caseId      String                  @db.Uuid
   caseRef     String
@@ -263,19 +264,19 @@ model Communication {
   direction   CommunicationDirection
   channel     CommunicationChannel
   status      String
-  sendAt      DateTime                @default(now())
+  sendAt      DateTime                @default(now()) @db.Timestamptz
   providerMessageId String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime @default(now()) @db.Timestamptz
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  case   Case   @relation(fields: [caseId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  case   Case   @relation(fields: [caseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@index([tenantId, caseRef])
-  @@index([tenantId, status])
+  @@index([tenantId, caseRef], map: "communication_tenant_ref_idx")
+  @@index([tenantId, status], map: "communication_tenant_status_idx")
 }
 
 model Payout {
-  id             String   @id @default(uuid()) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId       String   @db.Uuid
   caseId         String   @db.Uuid
   caseRef        String
@@ -283,25 +284,26 @@ model Payout {
   currency       String   @default("USD")
   status         String
   reference      String?
-  processedAt    DateTime?
-  confirmedAt    DateTime?
+  processedAt    DateTime? @db.Timestamptz
+  confirmedAt    DateTime? @db.Timestamptz
   confirmedBy    String?  @db.Uuid
   evidenceKey    String?
   feeCents       Int?
   feeRateBps     Int?
   metadata       Json?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime @default(now()) @db.Timestamptz
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  case   Case   @relation(fields: [caseId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  case   Case   @relation(fields: [caseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  confirmedByUser User? @relation("PayoutConfirmedBy", fields: [confirmedBy], references: [id], onDelete: SetNull, onUpdate: NoAction)
   invoice Invoice? @relation("InvoicePayout")
 
-  @@index([tenantId, caseRef])
-  @@index([tenantId, status])
+  @@index([tenantId, caseRef], map: "payout_tenant_ref_idx")
+  @@index([tenantId, status], map: "payout_tenant_status_idx")
 }
 
 model FeeAgreement {
-  id             String   @id @default(uuid()) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId       String   @db.Uuid
   tierMin        TierLevel
   tierMax        TierLevel
@@ -311,51 +313,51 @@ model FeeAgreement {
   stateCode      String?
   contractRef    String?
   notes          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now()) @db.Timestamptz
+  updatedAt      DateTime @updatedAt @db.Timestamptz
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@index([tenantId, tierMin, tierMax])
-  @@index([tenantId, stateCode])
-  @@index([tenantId, contractRef])
+  @@index([tenantId, tierMin, tierMax], map: "fee_agreement_tier_idx")
+  @@index([tenantId, stateCode], map: "fee_agreement_state_idx")
+  @@index([tenantId, contractRef], map: "fee_agreement_contract_idx")
 }
 
 model Invoice {
-  id          String   @id @default(uuid()) @db.Uuid
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId    String   @db.Uuid
   caseId      String   @db.Uuid
   caseRef     String
-  payoutId    String?  @unique @db.Uuid
+  payoutId    String?  @unique(map: "Invoice_payoutId_key") @db.Uuid
   amountCents Int
   feeRateBps  Int?
   currency    String   @default("USD")
   status      String   @default("PENDING")
-  issuedAt    DateTime @default(now())
-  dueAt       DateTime?
+  issuedAt    DateTime @default(now()) @db.Timestamptz
+  dueAt       DateTime? @db.Timestamptz
   metadata    Json?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime @default(now()) @db.Timestamptz
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  case   Case   @relation(fields: [caseId], references: [id])
-  payout Payout? @relation("InvoicePayout", fields: [payoutId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  case   Case   @relation(fields: [caseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  payout Payout? @relation("InvoicePayout", fields: [payoutId], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
-  @@index([tenantId, caseRef])
-  @@index([tenantId, status])
+  @@index([tenantId, caseRef], map: "invoice_tenant_ref_idx")
+  @@index([tenantId, status], map: "invoice_tenant_status_idx")
 }
 
 model Session {
-  id               String   @id @default(uuid()) @db.Uuid
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tenantId         String   @db.Uuid
   userId           String   @db.Uuid
   refreshTokenHash String
-  expiresAt        DateTime
-  createdAt        DateTime @default(now())
-  revokedAt        DateTime?
+  expiresAt        DateTime @db.Timestamptz
+  createdAt        DateTime @default(now()) @db.Timestamptz
+  revokedAt        DateTime? @db.Timestamptz
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  user   User   @relation(fields: [userId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
-  @@index([tenantId, userId])
-  @@unique([refreshTokenHash])
+  @@index([tenantId, userId], map: "Session_tenantId_userId_idx")
+  @@unique([refreshTokenHash], map: "Session_refreshTokenHash_key")
 }
