@@ -46,8 +46,15 @@ function canReach(host, port) {
     const url = new URL(dbUrl.replace(/^postgresql/, 'postgres'));
     const port = url.port ? Number(url.port) : 5432;
     const reachable = await canReach(url.hostname, port);
+    const isCi = process.env.CI === 'true';
 
     if (!reachable) {
+      if (isCi) {
+        console.error(
+          `CI=true and database is unreachable at ${url.hostname}:${port}; failing DB-dependent tests.`
+        );
+        process.exit(1);
+      }
       console.warn(`Skipping DB-dependent tests (database unreachable at ${url.hostname}:${port})`);
       return;
     }
