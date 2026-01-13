@@ -68,6 +68,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Wait for Postgres
+        shell: bash
+        run: |
+          echo "Waiting for Postgres on localhost:5432..."
+          for i in {1..30}; do
+            if (echo > /dev/tcp/localhost/5432) >/dev/null 2>&1; then
+              echo "Postgres is reachable."
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Postgres did not become reachable on localhost:5432 within 30 seconds." >&2
+          exit 1
+
       - name: Lint
         run: pnpm lint
 
