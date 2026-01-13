@@ -1,0 +1,5 @@
+ALTER TABLE "Attorney" ALTER COLUMN "updatedAt" SET DEFAULT now();
+ALTER TABLE "Case" ALTER COLUMN "updatedAt" SET DEFAULT now();
+ALTER TABLE "FeeAgreement" ALTER COLUMN "updatedAt" SET DEFAULT now();
+ALTER TABLE "Tenant" ALTER COLUMN "updatedAt" SET DEFAULT now();
+ALTER TABLE "User" ALTER COLUMN "updatedAt" SET DEFAULT now();
