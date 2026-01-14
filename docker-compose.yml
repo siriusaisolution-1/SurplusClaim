@@ -12,6 +12,15 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  postgres_shadow:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: surplus
+      POSTGRES_PASSWORD: surplus
+      POSTGRES_DB: surplus_shadow
+    ports:
+      - "5433:5432"
+
   redis:
     image: redis:7
     ports:
