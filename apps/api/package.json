@@ -11,6 +11,8 @@
     "format": "prettier --write 'src/**/*.ts'",
     "prisma:migrate": "pnpm exec prisma migrate deploy --schema ./prisma/schema.prisma",
     "prisma:migrate:dev": "pnpm exec prisma migrate dev --schema ./prisma/schema.prisma",
+    "prisma:validate": "pnpm exec prisma validate --schema ./prisma/schema.prisma && pnpm exec prisma generate --schema ./prisma/schema.prisma",
+    "prisma:drift": "pnpm exec prisma migrate diff --from-schema-datamodel=./prisma/schema.prisma --to-migrations=./prisma/migrations --shadow-database-url=$SHADOW_DATABASE_URL --exit-code",
     "prisma:generate": "pnpm exec prisma generate --schema ./prisma/schema.prisma",
     "prisma:seed": "pnpm exec prisma db seed --schema ./prisma/schema.prisma",
     "postinstall": "pnpm exec prisma generate --schema ./prisma/schema.prisma"
