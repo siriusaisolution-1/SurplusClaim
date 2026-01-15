@@ -29,6 +29,7 @@ export class RulesRegistry {
   private basePath: string;
 
   private readonly disabledJurisdictions: Set<string>;
+  private readonly phaseOneState = 'CA';
 
   constructor(options?: RulesRegistryOptions) {
     this.basePath = options?.basePath ?? getDefaultRulesDirectory(__dirname);
@@ -65,6 +66,9 @@ export class RulesRegistry {
   }
 
   private isEnabled(rule: JurisdictionRule) {
+    if (rule.state.toUpperCase() !== this.phaseOneState) {
+      return false;
+    }
     const key = buildKey(rule.state, rule.county_code);
     return rule.feature_flags.enabled && !this.disabledJurisdictions.has(key);
   }
@@ -93,6 +97,9 @@ export class RulesRegistry {
   }
 
   getChecklistItems(state: string, countyCode: string): ChecklistItem[] {
+    if (state.toUpperCase() !== this.phaseOneState) {
+      throw new Error('Phase 1 supports California (CA) only');
+    }
     const rule = this.getRule(state, countyCode);
 
     if (!rule) {

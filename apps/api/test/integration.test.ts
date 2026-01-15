@@ -62,7 +62,8 @@ async function seedTenants() {
       caseRef: 'CASE-A-001',
       status: 'DISCOVERED',
       tierSuggested: 'MEDIUM',
-      assignedReviewerId: reviewerA.id
+      assignedReviewerId: reviewerA.id,
+      metadata: { jurisdiction: { state: 'CA', county_code: 'LOS_ANGELES', county_name: 'Los Angeles County' } }
     }
   });
 
@@ -156,6 +157,56 @@ async function main() {
     .expect(200);
 
   assert.ok(exportResponse.text.includes('CASE_VIEWED'));
+
+  const packageDenied = await request(server)
+    .post('/cases/CASE-A-001/package/generate')
+    .set('Authorization', `Bearer ${adminToken}`)
+    .expect(400);
+
+  assert.strictEqual(packageDenied.body.message, 'Checklist incomplete');
+  assert.ok(Array.isArray(packageDenied.body.missing));
+
+  await prisma.document.createMany({
+    data: [
+      {
+        tenantId: seed.tenantA.id,
+        caseId: seed.caseA.id,
+        caseRef: seed.caseA.caseRef,
+        objectKey: 'tests/claimant-id.pdf',
+        originalFilename: 'claimant-id.pdf',
+        sha256: 'hash-claimant',
+        docType: 'claimant_id',
+        status: 'PENDING'
+      },
+      {
+        tenantId: seed.tenantA.id,
+        caseId: seed.caseA.id,
+        caseRef: seed.caseA.caseRef,
+        objectKey: 'tests/proof-of-ownership.pdf',
+        originalFilename: 'proof-of-ownership.pdf',
+        sha256: 'hash-proof',
+        docType: 'proof_of_ownership',
+        status: 'PENDING'
+      },
+      {
+        tenantId: seed.tenantA.id,
+        caseId: seed.caseA.id,
+        caseRef: seed.caseA.caseRef,
+        objectKey: 'tests/w9.pdf',
+        originalFilename: 'w9.pdf',
+        sha256: 'hash-w9',
+        docType: 'w9',
+        status: 'PENDING'
+      }
+    ]
+  });
+
+  const packageOk = await request(server)
+    .post('/cases/CASE-A-001/package/generate')
+    .set('Authorization', `Bearer ${adminToken}`)
+    .expect(201);
+
+  assert.ok(packageOk.body.artifactId);
 
   const earliestAudit = await prisma.auditLog.findFirst({
     where: { tenantId: seed.tenantA.id },

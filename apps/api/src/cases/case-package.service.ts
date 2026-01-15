@@ -3,13 +3,14 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import AdmZip from 'adm-zip';
 import PDFDocument from 'pdfkit';
 
 import { AuditService } from '../audit/audit.service';
 import { DocumentsService } from '../documents/documents.service';
 import { prisma } from '../prisma/prisma.client';
+import { RulesService } from '../rules/rules.service';
 
 const PACKAGE_DIR = path.join(process.cwd(), 'apps', 'api', 'storage', 'packages');
 const UPLOADS_DIR = path.join(process.cwd(), 'services', 'uploads');
@@ -18,7 +19,8 @@ const UPLOADS_DIR = path.join(process.cwd(), 'services', 'uploads');
 export class CasePackageService {
   constructor(
     private readonly auditService: AuditService,
-    private readonly documentsService: DocumentsService
+    private readonly documentsService: DocumentsService,
+    private readonly rulesService: RulesService
   ) {
     if (!fs.existsSync(PACKAGE_DIR)) {
       fs.mkdirSync(PACKAGE_DIR, { recursive: true });
@@ -37,6 +39,11 @@ export class CasePackageService {
     const base = document.originalFilename?.toString().replace(/\s+/g, '-') ?? 'document';
     const label = document.docType ?? document.aiDocType ?? 'unclassified';
     return `${label}-${document.id}-${base}`;
+  }
+
+  private documentMatches(doc: any, requiredId: string) {
+    const label = (doc.docType ?? doc.aiDocType ?? '').toString().toLowerCase();
+    return label === requiredId.toLowerCase();
   }
 
   private summarizeChecklist(checklist?: any) {
@@ -215,6 +222,17 @@ export class CasePackageService {
       throw new NotFoundException('Case not found');
     }
 
+    const jurisdiction = (caseRecord.metadata as any)?.jurisdiction;
+    if (!jurisdiction?.state || !jurisdiction?.county_code) {
+      throw new BadRequestException('Missing jurisdiction state/county');
+    }
+
+    const rulesChecklist = this.rulesService.buildChecklist({
+      case_ref: caseRecord.caseRef,
+      state: jurisdiction.state,
+      county_code: jurisdiction.county_code
+    });
+
     const [documents, checklist, consent] = await Promise.all([
       prisma.document.findMany({
         where: { tenantId, caseId: caseRecord.id },
@@ -223,6 +241,15 @@ export class CasePackageService {
       this.documentsService.getChecklistProgress(tenantId, caseRef).catch(() => null),
       prisma.consent.findFirst({ where: { tenantId, caseRef, revokedAt: null } })
     ]);
+
+    const missing = rulesChecklist.items
+      .filter((item: any) => item.type === 'document')
+      .filter((item: any) => !documents.some((doc) => this.documentMatches(doc, item.id) && doc.status !== 'REJECTED'))
+      .map((item: any) => item.id);
+
+    if (missing.length > 0) {
+      throw new BadRequestException({ message: 'Checklist incomplete', missing });
+    }
 
     const packageBuffer = await this.buildPackageBuffer({
       tenantId,

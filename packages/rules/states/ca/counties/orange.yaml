@@ -1,0 +1,44 @@
+state: CA
+county_code: ORANGE
+county_name: Orange County
+feature_flags:
+  enabled: true
+  notes: "Phase 1 pilot checklist"
+required_documents:
+  - id: claimant_id
+    title: Government-issued photo ID
+    description: Identification for the claimant or authorized representative.
+    required: true
+  - id: proof_of_ownership
+    title: Proof of ownership
+    description: Deed, tax bill, or similar record tied to the property.
+    required: true
+  - id: w9
+    title: IRS W-9
+    description: Required to process disbursement of funds.
+    required: true
+forms:
+  - id: oc_claim_form
+    name: Orange County Claim Form
+    url: https://example.org/forms/ca/orange-county-claim.pdf
+    description: Official county form for initiating a surplus claim.
+procedural:
+  submission_channels:
+    - mail
+    - in_person
+  deadlines:
+    - name: filing-window
+      timeline: Submit within 90 days of notice.
+  addresses:
+    - name: Orange County Clerk
+      line1: 700 Civic Center Dr W
+      city: Santa Ana
+      state: CA
+      postal_code: "92701"
+allowed_email_templates:
+  - id: claimant-intake
+    name: Initial claimant outreach
+    description: Request for required documentation.
+fee_schedule:
+  min_fee_cents: 7500
+  max_fee_cents: 150000
