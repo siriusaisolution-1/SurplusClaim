@@ -387,7 +387,12 @@ export class CasesService {
             : Promise.resolve(null)
         ]);
 
-        return { ...rawCase, assignedReviewer, assignedAttorney } as any;
+        return {
+          ...rawCase,
+          legalExecutionMode: rawCase.legalExecutionMode ?? LegalExecutionMode.ATTORNEY_REQUIRED,
+          assignedReviewer,
+          assignedAttorney
+        } as any;
       }
 
       throw error;

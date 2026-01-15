@@ -62,6 +62,7 @@ async function seedTenants() {
       caseRef: 'CASE-A-001',
       status: 'DISCOVERED',
       tierSuggested: 'MEDIUM',
+      legalExecutionMode: 'ATTORNEY_REQUIRED',
       assignedReviewerId: reviewerA.id,
       metadata: { jurisdiction: { state: 'CA', county_code: 'LOS_ANGELES', county_name: 'Los Angeles County' } }
     }
@@ -73,6 +74,7 @@ async function seedTenants() {
       caseRef: 'CASE-B-001',
       status: 'TRIAGED',
       tierSuggested: 'HIGH',
+      legalExecutionMode: 'ATTORNEY_REQUIRED',
       assignedReviewerId: adminB.id
     }
   });
