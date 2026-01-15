@@ -4,11 +4,12 @@ if (process.env.RUN_API_INTEGRATION !== 'true') {
 }
 
 import assert from 'node:assert';
-import { promises as fs } from 'node:fs';
+import { createWriteStream, promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import PDFDocument from 'pdfkit';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
@@ -172,11 +173,20 @@ async function main() {
 
   const uploadsRoot = path.join(process.cwd(), 'services', 'uploads', 'tests');
   await fs.mkdir(uploadsRoot, { recursive: true });
-  const minimalPdf = '%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n';
+  const writePdfFixture = async (filePath: string) =>
+    new Promise<void>((resolve, reject) => {
+      const doc = new PDFDocument({ size: [200, 200] });
+      const stream = doc.pipe(createWriteStream(filePath));
+      stream.on('finish', resolve);
+      stream.on('error', reject);
+      doc.fontSize(12).text('Test', 50, 150);
+      doc.end();
+    });
+
   await Promise.all([
-    fs.writeFile(path.join(uploadsRoot, 'claimant-id.pdf'), minimalPdf),
-    fs.writeFile(path.join(uploadsRoot, 'proof-of-ownership.pdf'), minimalPdf),
-    fs.writeFile(path.join(uploadsRoot, 'w9.pdf'), minimalPdf)
+    writePdfFixture(path.join(uploadsRoot, 'claimant-id.pdf')),
+    writePdfFixture(path.join(uploadsRoot, 'proof-of-ownership.pdf')),
+    writePdfFixture(path.join(uploadsRoot, 'w9.pdf'))
   ]);
 
   await prisma.document.createMany({
