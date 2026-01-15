@@ -60,11 +60,14 @@ describe('ChecklistGenerator', () => {
     expect(checklist).toMatchSnapshot();
   });
 
-  it('rejects non-CA checklist requests in phase 1', () => {
+  it('marks non-CA jurisdictions as disabled in phase 1', () => {
     const registry = new RulesRegistry();
+    const jurisdictions = registry.listJurisdictions();
 
-    expect(() => registry.getChecklistItems('GA', 'FULTON')).toThrow(
-      'Phase 1 supports California (CA) only'
-    );
+    const fulton = jurisdictions.find((item) => item.state === 'GA' && item.county_code === 'FULTON');
+    const harris = jurisdictions.find((item) => item.state === 'TX' && item.county_code === 'HARRIS');
+
+    expect(fulton?.enabled).toBe(false);
+    expect(harris?.enabled).toBe(false);
   });
 });

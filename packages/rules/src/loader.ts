@@ -91,16 +91,14 @@ export class RulesRegistry {
   }
 
   isJurisdictionEnabled(state: string, countyCode: string): boolean {
-    const rule = this.rules.get(buildKey(state, countyCode));
+    const key = buildKey(state, countyCode);
+    const rule = this.rules.get(key);
     if (!rule) return false;
-    return this.isEnabled(rule);
+    return rule.feature_flags.enabled && !this.disabledJurisdictions.has(key);
   }
 
   getChecklistItems(state: string, countyCode: string): ChecklistItem[] {
-    if (state.toUpperCase() !== this.phaseOneState) {
-      throw new Error('Phase 1 supports California (CA) only');
-    }
-    const rule = this.getRule(state, countyCode);
+    const rule = this.rules.get(buildKey(state, countyCode));
 
     if (!rule) {
       throw new Error(`No rules found for ${state}/${countyCode}`);
