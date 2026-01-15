@@ -85,7 +85,7 @@ export class CasePackageService {
     consentOnFile: boolean;
   }): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50 });
+      const doc = new PDFDocument({ margin: 50, compress: false });
       const chunks: Buffer[] = [];
       const footerText = `Case ${params.caseRecord.caseRef} • Tenant ${params.tenantId} • ${new Date().toISOString()}`;
 
