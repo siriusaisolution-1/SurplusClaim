@@ -12,8 +12,8 @@
     "dev:web": "pnpm --filter @surplus/web dev",
     "lint:web": "pnpm --filter @surplus/web lint",
     "test:web": "pnpm --filter @surplus/web test",
-    "prisma:validate": "pnpm --filter @surplus/api prisma:validate",
-    "prisma:drift": "pnpm --filter @surplus/api prisma:drift",
+    "prisma:validate": "pnpm --filter @surplus/api exec prisma validate --schema ./prisma/schema.prisma && pnpm --filter @surplus/api exec prisma generate --schema ./prisma/schema.prisma",
+    "prisma:drift": "pnpm --filter @surplus/api exec prisma migrate diff --from-schema-datamodel=./prisma/schema.prisma --to-migrations=./prisma/migrations --shadow-database-url=$SHADOW_DATABASE_URL --exit-code",
     "postinstall": "pnpm --filter @surplus/api prisma:generate"
   },
   "devDependencies": {
