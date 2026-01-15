@@ -43,6 +43,11 @@ export type CaseTransitionInput = {
   closureConfirmationRequired?: boolean;
 };
 
+export type ClosureConfirmationInput = {
+  confirmed: true;
+  note?: string;
+};
+
 type CaseLock = { code: 'PAYOUT_OVERDUE' | 'UNCONFIRMED_PAYOUT'; message: string };
 
 type TriagedTier = 'TIER_A' | 'TIER_B' | 'TIER_C';
@@ -734,6 +739,12 @@ export class CasesService {
     const effectiveLegalExecutionMode = input.legalExecutionMode ?? caseRecord.legalExecutionMode;
     const effectiveAssignedAttorneyId =
       input.assignedAttorneyId !== undefined ? input.assignedAttorneyId : caseRecord.assignedAttorneyId;
+    const effectiveExpectedPayoutWindow =
+      input.expectedPayoutWindow !== undefined ? input.expectedPayoutWindow : caseRecord.expectedPayoutWindow;
+    const effectiveClosureConfirmationRequired =
+      input.closureConfirmationRequired !== undefined
+        ? input.closureConfirmationRequired
+        : caseRecord.closureConfirmationRequired;
 
     const payoutState = await this.getPayoutState(tenantId, caseRecord.id);
     const payoutEvidence =
@@ -770,6 +781,14 @@ export class CasesService {
     }
 
     if (input.toState === CaseStatus.PAYOUT_CONFIRMED) {
+      if (!effectiveExpectedPayoutWindow || effectiveExpectedPayoutWindow.trim() === '') {
+        throw new BadRequestException('Expected payout window must be set before payout confirmation');
+      }
+      if (effectiveClosureConfirmationRequired !== true) {
+        throw new BadRequestException(
+          'Closure confirmation required must be set to true before payout confirmation per compliance'
+        );
+      }
       assertPayoutConfirmable({
         legalExecutionMode: effectiveLegalExecutionMode,
         assignedAttorneyId: effectiveAssignedAttorneyId,
@@ -782,9 +801,9 @@ export class CasesService {
         throw new BadRequestException('Cannot close case while payout is still unconfirmed');
       }
 
-      if (caseRecord.closureConfirmationRequired) {
+      if (effectiveClosureConfirmationRequired) {
         const confirmation = await prisma.caseEvent.findFirst({
-          where: { tenantId, caseId: caseRecord.id, type: 'CLOSURE_CONFIRMED' }
+          where: { tenantId, caseRef: caseRecord.caseRef, type: 'CLOSURE_CONFIRMED' }
         });
 
         if (!confirmation) {
@@ -870,6 +889,55 @@ export class CasesService {
       allowedTransitions: this.getAllowedTransitions(updatedCase.status),
       locks: await this.getCaseLocks(tenantId, updatedCase)
     };
+  }
+
+  async confirmClosure(
+    tenantId: string,
+    actorId: string,
+    caseRef: string,
+    input: ClosureConfirmationInput
+  ) {
+    if (input.confirmed !== true) {
+      throw new BadRequestException('Closure confirmation requires confirmed=true');
+    }
+
+    const caseRecord = await this.findByCaseRef(tenantId, caseRef);
+
+    if (!caseRecord) {
+      throw new NotFoundException('Case not found');
+    }
+
+    const existing = await prisma.caseEvent.findFirst({
+      where: { tenantId, caseRef, type: 'CLOSURE_CONFIRMED' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]
+    });
+
+    if (existing) {
+      return { confirmation: existing };
+    }
+
+    const note = input.note?.trim() ? input.note.trim() : null;
+
+    const confirmation = await prisma.caseEvent.create({
+      data: {
+        tenantId,
+        caseId: caseRecord.id,
+        caseRef: caseRecord.caseRef,
+        type: 'CLOSURE_CONFIRMED',
+        payload: { confirmed: true, note }
+      }
+    });
+
+    await this.auditService.logAction({
+      tenantId,
+      actorId,
+      caseId: caseRecord.id,
+      caseRef: caseRecord.caseRef,
+      action: 'CLOSURE_CONFIRMED',
+      metadata: { caseRef: caseRecord.caseRef, confirmed: true, note }
+    });
+
+    return { confirmation };
   }
 
   async getCaseWithTimeline(tenantId: string, caseRef: string) {

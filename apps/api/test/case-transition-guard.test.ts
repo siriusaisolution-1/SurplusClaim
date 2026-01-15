@@ -45,7 +45,23 @@ async function main() {
         caseRef: 'CASE-GUARD-1',
         status: CaseStatus.SUBMITTED,
         tierSuggested: TierLevel.LOW,
-        legalExecutionMode: LegalExecutionMode.ATTORNEY_REQUIRED
+        legalExecutionMode: LegalExecutionMode.ATTORNEY_REQUIRED,
+        expectedPayoutWindow: '2030-01-01T00:00:00.000Z',
+        closureConfirmationRequired: true
+      }
+    });
+
+    await prisma.payout.create({
+      data: {
+        tenantId: tenant.id,
+        caseId: caseWithoutAttorney.id,
+        caseRef: caseWithoutAttorney.caseRef,
+        amountCents: 1234,
+        currency: 'USD',
+        status: 'PENDING',
+        reference: 'evidence-missing-attorney',
+        evidenceKey: 'object-key-payout',
+        metadata: { evidenceSha256: 'hash-123' }
       }
     });
 
@@ -65,12 +81,28 @@ async function main() {
         caseRef: 'CASE-GUARD-NO-LEGAL',
         status: CaseStatus.SUBMITTED,
         tierSuggested: TierLevel.LOW,
-        legalExecutionMode: LegalExecutionMode.OPS_DIRECT
+        legalExecutionMode: LegalExecutionMode.OPS_DIRECT,
+        expectedPayoutWindow: '2030-01-01T00:00:00.000Z',
+        closureConfirmationRequired: true
       }
     });
     await prisma.$executeRawUnsafe(
       `UPDATE "Case" SET "legalExecutionMode" = NULL WHERE "id" = '${caseWithoutLegalExecution.id}';`
     );
+
+    await prisma.payout.create({
+      data: {
+        tenantId: tenant.id,
+        caseId: caseWithoutLegalExecution.id,
+        caseRef: caseWithoutLegalExecution.caseRef,
+        amountCents: 1234,
+        currency: 'USD',
+        status: 'PENDING',
+        reference: 'evidence-missing-legal',
+        evidenceKey: 'object-key-payout',
+        metadata: { evidenceSha256: 'hash-123' }
+      }
+    });
 
     await assert.rejects(
       () =>
@@ -93,7 +125,9 @@ async function main() {
         caseRef: 'CASE-GUARD-NO-EVIDENCE',
         status: CaseStatus.SUBMITTED,
         tierSuggested: TierLevel.LOW,
-        legalExecutionMode: LegalExecutionMode.OPS_DIRECT
+        legalExecutionMode: LegalExecutionMode.OPS_DIRECT,
+        expectedPayoutWindow: '2030-01-01T00:00:00.000Z',
+        closureConfirmationRequired: true
       }
     });
 
@@ -112,7 +146,9 @@ async function main() {
         status: CaseStatus.SUBMITTED,
         tierSuggested: TierLevel.MEDIUM,
         assignedAttorneyId: attorney.id,
-        legalExecutionMode: LegalExecutionMode.ATTORNEY_REQUIRED
+        legalExecutionMode: LegalExecutionMode.ATTORNEY_REQUIRED,
+        expectedPayoutWindow: '2030-01-01T00:00:00.000Z',
+        closureConfirmationRequired: true
       }
     });
 
@@ -145,7 +181,8 @@ async function main() {
         caseRef: 'CASE-GUARD-3',
         status: CaseStatus.PAYOUT_CONFIRMED,
         tierSuggested: TierLevel.HIGH,
-        legalExecutionMode: LegalExecutionMode.ATTORNEY_REQUIRED
+        legalExecutionMode: LegalExecutionMode.ATTORNEY_REQUIRED,
+        closureConfirmationRequired: true
       }
     });
 
@@ -176,6 +213,11 @@ async function main() {
       (error) => error instanceof BadRequestException
     );
 
+    await casesService.confirmClosure(tenant.id, actor.id, closureBlocked.caseRef, {
+      confirmed: true,
+      note: 'closure confirmed'
+    });
+
     await prisma.case.update({
       where: { id: closureBlocked.id },
       data: { assignedAttorneyId: attorney.id }
@@ -186,6 +228,75 @@ async function main() {
     });
 
     assert.strictEqual(closed.status, CaseStatus.CLOSED);
+
+    const missingWindowCase = await prisma.case.create({
+      data: {
+        tenantId: tenant.id,
+        caseRef: 'CASE-GUARD-NO-WINDOW',
+        status: CaseStatus.SUBMITTED,
+        tierSuggested: TierLevel.MEDIUM,
+        assignedAttorneyId: attorney.id,
+        legalExecutionMode: LegalExecutionMode.ATTORNEY_REQUIRED,
+        closureConfirmationRequired: true
+      }
+    });
+
+    await prisma.payout.create({
+      data: {
+        tenantId: tenant.id,
+        caseId: missingWindowCase.id,
+        caseRef: missingWindowCase.caseRef,
+        amountCents: 1234,
+        currency: 'USD',
+        status: 'PENDING',
+        reference: 'missing-window',
+        evidenceKey: 'object-key-payout',
+        metadata: { evidenceSha256: 'hash-123' }
+      }
+    });
+
+    await assert.rejects(
+      () =>
+        casesService.transitionCase(tenant.id, actor.id, missingWindowCase.caseRef, {
+          toState: CaseStatus.PAYOUT_CONFIRMED
+        }),
+      (error) => error instanceof BadRequestException
+    );
+
+    const missingClosureRequiredCase = await prisma.case.create({
+      data: {
+        tenantId: tenant.id,
+        caseRef: 'CASE-GUARD-NO-CLOSURE-REQUIRED',
+        status: CaseStatus.SUBMITTED,
+        tierSuggested: TierLevel.MEDIUM,
+        assignedAttorneyId: attorney.id,
+        legalExecutionMode: LegalExecutionMode.ATTORNEY_REQUIRED,
+        expectedPayoutWindow: '2030-01-01T00:00:00.000Z',
+        closureConfirmationRequired: false
+      }
+    });
+
+    await prisma.payout.create({
+      data: {
+        tenantId: tenant.id,
+        caseId: missingClosureRequiredCase.id,
+        caseRef: missingClosureRequiredCase.caseRef,
+        amountCents: 1234,
+        currency: 'USD',
+        status: 'PENDING',
+        reference: 'missing-closure-required',
+        evidenceKey: 'object-key-payout',
+        metadata: { evidenceSha256: 'hash-123' }
+      }
+    });
+
+    await assert.rejects(
+      () =>
+        casesService.transitionCase(tenant.id, actor.id, missingClosureRequiredCase.caseRef, {
+          toState: CaseStatus.PAYOUT_CONFIRMED
+        }),
+      (error) => error instanceof BadRequestException
+    );
 
     const overdueCase = await prisma.case.create({
       data: {

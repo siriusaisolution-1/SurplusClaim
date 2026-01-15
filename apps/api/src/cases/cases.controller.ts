@@ -6,6 +6,7 @@ import { CurrentUser, Roles } from '../auth/auth.decorators';
 import {
   CaseTransitionInput,
   CasesService,
+  ClosureConfirmationInput,
   ConfirmTriageInput,
   CreateCaseInput,
   TriageSuggestInput
@@ -204,6 +205,16 @@ export class CasesController {
     const updatedCase = await this.casesService.transitionCase(user.tenantId, user.sub, caseRef, body);
 
     return updatedCase;
+  }
+
+  @Post(':caseRef/closure/confirm')
+  @Roles('TENANT_ADMIN', 'OPS', 'REVIEWER')
+  async confirmClosure(
+    @Param('caseRef') caseRef: string,
+    @Body() body: ClosureConfirmationInput,
+    @CurrentUser() user: any
+  ) {
+    return this.casesService.confirmClosure(user.tenantId, user.sub, caseRef, body);
   }
 
   @Post(':caseRef/triage/suggest')
