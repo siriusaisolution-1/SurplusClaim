@@ -346,10 +346,13 @@ export class CasesService {
 
   async findByCaseRef(tenantId: string, caseRef: string) {
     try {
-      return await prisma.case.findFirst({
-        where: { tenantId, caseRef },
+      const caseRecord = await prisma.case.findFirst({
+        where: { tenantId, caseRef, legalExecutionMode: { not: null } },
         include: { assignedReviewer: true, assignedAttorney: true }
       });
+      if (caseRecord) {
+        return caseRecord;
+      }
     } catch (error: any) {
       const message = error?.message ?? '';
 
@@ -397,6 +400,46 @@ export class CasesService {
 
       throw error;
     }
+
+    const rows = await prisma.$queryRaw<
+      Array<{
+        id: string;
+        tenantId: string;
+        caseRef: string;
+        status: CaseStatus;
+        tierSuggested: TierLevel;
+        tierConfirmed: TierLevel | null;
+        assignedReviewerId: string | null;
+        assignedAttorneyId: string | null;
+        legalExecutionMode: LegalExecutionMode | null;
+        expectedPayoutWindow: string | null;
+        closureConfirmationRequired: boolean;
+        metadata: Record<string, unknown> | null;
+        createdAt: Date;
+        updatedAt: Date;
+      }>
+    >(
+      Prisma.sql`SELECT * FROM "Case" WHERE "tenantId" = ${tenantId}::uuid AND "caseRef" = ${caseRef} LIMIT 1`
+    );
+
+    const rawCase = rows[0];
+    if (!rawCase) return null;
+
+    const [assignedReviewer, assignedAttorney] = await Promise.all([
+      rawCase.assignedReviewerId
+        ? prisma.user.findUnique({ where: { id: rawCase.assignedReviewerId } })
+        : Promise.resolve(null),
+      rawCase.assignedAttorneyId
+        ? prisma.attorney.findUnique({ where: { id: rawCase.assignedAttorneyId } })
+        : Promise.resolve(null)
+    ]);
+
+    return {
+      ...rawCase,
+      legalExecutionMode: rawCase.legalExecutionMode ?? LegalExecutionMode.ATTORNEY_REQUIRED,
+      assignedReviewer,
+      assignedAttorney
+    } as any;
   }
 
   async listCases(tenantId: string, params: ListCasesParams) {

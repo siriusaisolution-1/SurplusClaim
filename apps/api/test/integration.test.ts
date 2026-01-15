@@ -172,10 +172,11 @@ async function main() {
 
   const uploadsRoot = path.join(process.cwd(), 'services', 'uploads', 'tests');
   await fs.mkdir(uploadsRoot, { recursive: true });
+  const minimalPdf = '%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n';
   await Promise.all([
-    fs.writeFile(path.join(uploadsRoot, 'claimant-id.pdf'), 'fixture'),
-    fs.writeFile(path.join(uploadsRoot, 'proof-of-ownership.pdf'), 'fixture'),
-    fs.writeFile(path.join(uploadsRoot, 'w9.pdf'), 'fixture')
+    fs.writeFile(path.join(uploadsRoot, 'claimant-id.pdf'), minimalPdf),
+    fs.writeFile(path.join(uploadsRoot, 'proof-of-ownership.pdf'), minimalPdf),
+    fs.writeFile(path.join(uploadsRoot, 'w9.pdf'), minimalPdf)
   ]);
 
   await prisma.document.createMany({
