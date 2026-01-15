@@ -4,6 +4,8 @@ if (process.env.RUN_API_INTEGRATION !== 'true') {
 }
 
 import assert from 'node:assert';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -167,6 +169,14 @@ async function main() {
 
   assert.strictEqual(packageDenied.body.message, 'Checklist incomplete');
   assert.ok(Array.isArray(packageDenied.body.missing));
+
+  const uploadsRoot = path.join(process.cwd(), 'services', 'uploads', 'tests');
+  await fs.mkdir(uploadsRoot, { recursive: true });
+  await Promise.all([
+    fs.writeFile(path.join(uploadsRoot, 'claimant-id.pdf'), 'fixture'),
+    fs.writeFile(path.join(uploadsRoot, 'proof-of-ownership.pdf'), 'fixture'),
+    fs.writeFile(path.join(uploadsRoot, 'w9.pdf'), 'fixture')
+  ]);
 
   await prisma.document.createMany({
     data: [
