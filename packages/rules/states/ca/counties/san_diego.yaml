@@ -1,0 +1,44 @@
+state: CA
+county_code: SAN_DIEGO
+county_name: San Diego County
+feature_flags:
+  enabled: true
+  notes: "Phase 1 pilot checklist"
+required_documents:
+  - id: claimant_id
+    title: Government-issued photo ID
+    description: Identification for the claimant or authorized representative.
+    required: true
+  - id: proof_of_ownership
+    title: Proof of ownership
+    description: Deed, tax bill, or similar record tied to the property.
+    required: true
+  - id: w9
+    title: IRS W-9
+    description: Required to process disbursement of funds.
+    required: true
+forms:
+  - id: sd_claim_form
+    name: San Diego County Claim Form
+    url: https://example.org/forms/ca/san-diego-claim.pdf
+    description: Official county form for initiating a surplus claim.
+procedural:
+  submission_channels:
+    - mail
+    - in_person
+  deadlines:
+    - name: filing-window
+      timeline: Submit within 90 days of notice.
+  addresses:
+    - name: San Diego County Clerk
+      line1: 1600 Pacific Hwy
+      city: San Diego
+      state: CA
+      postal_code: "92101"
+allowed_email_templates:
+  - id: claimant-intake
+    name: Initial claimant outreach
+    description: Request for required documentation.
+fee_schedule:
+  min_fee_cents: 7500
+  max_fee_cents: 150000

@@ -29,6 +29,7 @@ export class RulesRegistry {
   private basePath: string;
 
   private readonly disabledJurisdictions: Set<string>;
+  private readonly phaseOneState = 'CA';
 
   constructor(options?: RulesRegistryOptions) {
     this.basePath = options?.basePath ?? getDefaultRulesDirectory(__dirname);
@@ -65,6 +66,9 @@ export class RulesRegistry {
   }
 
   private isEnabled(rule: JurisdictionRule) {
+    if (rule.state.toUpperCase() !== this.phaseOneState) {
+      return false;
+    }
     const key = buildKey(rule.state, rule.county_code);
     return rule.feature_flags.enabled && !this.disabledJurisdictions.has(key);
   }
@@ -87,13 +91,14 @@ export class RulesRegistry {
   }
 
   isJurisdictionEnabled(state: string, countyCode: string): boolean {
-    const rule = this.rules.get(buildKey(state, countyCode));
+    const key = buildKey(state, countyCode);
+    const rule = this.rules.get(key);
     if (!rule) return false;
-    return this.isEnabled(rule);
+    return rule.feature_flags.enabled && !this.disabledJurisdictions.has(key);
   }
 
   getChecklistItems(state: string, countyCode: string): ChecklistItem[] {
-    const rule = this.getRule(state, countyCode);
+    const rule = this.rules.get(buildKey(state, countyCode));
 
     if (!rule) {
       throw new Error(`No rules found for ${state}/${countyCode}`);

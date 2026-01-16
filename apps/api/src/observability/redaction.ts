@@ -13,25 +13,43 @@ const PII_KEYS = [
 
 const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 const PHONE_REGEX = /\+?\d{1,3}?[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/;
+const MAX_DEPTH = 10;
+const PII_KEYS_SET = new Set(PII_KEYS.map((key) => key.toLowerCase()));
 
 export function redactPII<T>(value: T): T {
+  return redactValue(value, 0, new WeakSet());
+}
+
+function redactValue<T>(value: T, depth: number, visited: WeakSet<object>): T {
   if (value === null || value === undefined) {
     return value;
   }
 
+  if (depth > MAX_DEPTH) {
+    return value;
+  }
+
   if (Array.isArray(value)) {
-    return value.map((item) => redactPII(item)) as unknown as T;
+    if (visited.has(value)) {
+      return '[CIRCULAR]' as T;
+    }
+    visited.add(value);
+    return value.map((item) => redactValue(item, depth + 1, visited)) as unknown as T;
   }
 
   if (typeof value === 'object') {
+    if (visited.has(value)) {
+      return '[CIRCULAR]' as T;
+    }
+    visited.add(value);
     const redacted: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-      if (PII_KEYS.includes(key)) {
+      if (PII_KEYS_SET.has(key.toLowerCase())) {
         redacted[key] = '[REDACTED]';
         continue;
       }
 
-      redacted[key] = redactPII(val);
+      redacted[key] = redactValue(val, depth + 1, visited);
     }
 
     return redacted as T;

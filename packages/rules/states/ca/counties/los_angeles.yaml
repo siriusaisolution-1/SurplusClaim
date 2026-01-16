@@ -1,0 +1,44 @@
+state: CA
+county_code: LOS_ANGELES
+county_name: Los Angeles County
+feature_flags:
+  enabled: true
+  notes: "Phase 1 pilot checklist"
+required_documents:
+  - id: claimant_id
+    title: Government-issued photo ID
+    description: Identification for the claimant or authorized representative.
+    required: true
+  - id: proof_of_ownership
+    title: Proof of ownership
+    description: Deed, tax bill, or similar record tied to the property.
+    required: true
+  - id: w9
+    title: IRS W-9
+    description: Required to process disbursement of funds.
+    required: true
+forms:
+  - id: la_claim_form
+    name: Los Angeles County Claim Form
+    url: https://example.org/forms/ca/los-angeles-claim.pdf
+    description: Official county form for initiating a surplus claim.
+procedural:
+  submission_channels:
+    - mail
+    - in_person
+  deadlines:
+    - name: filing-window
+      timeline: Submit within 90 days of notice.
+  addresses:
+    - name: Los Angeles County Clerk
+      line1: 111 N Hill St
+      city: Los Angeles
+      state: CA
+      postal_code: "90012"
+allowed_email_templates:
+  - id: claimant-intake
+    name: Initial claimant outreach
+    description: Request for required documentation.
+fee_schedule:
+  min_fee_cents: 7500
+  max_fee_cents: 150000

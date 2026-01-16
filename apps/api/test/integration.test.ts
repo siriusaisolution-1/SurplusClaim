@@ -4,9 +4,12 @@ if (process.env.RUN_API_INTEGRATION !== 'true') {
 }
 
 import assert from 'node:assert';
+import { createWriteStream, promises as fs } from 'node:fs';
+import path from 'node:path';
 
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import PDFDocument from 'pdfkit';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
@@ -62,7 +65,9 @@ async function seedTenants() {
       caseRef: 'CASE-A-001',
       status: 'DISCOVERED',
       tierSuggested: 'MEDIUM',
-      assignedReviewerId: reviewerA.id
+      legalExecutionMode: 'ATTORNEY_REQUIRED',
+      assignedReviewerId: reviewerA.id,
+      metadata: { jurisdiction: { state: 'CA', county_code: 'LOS_ANGELES', county_name: 'Los Angeles County' } }
     }
   });
 
@@ -72,6 +77,7 @@ async function seedTenants() {
       caseRef: 'CASE-B-001',
       status: 'TRIAGED',
       tierSuggested: 'HIGH',
+      legalExecutionMode: 'ATTORNEY_REQUIRED',
       assignedReviewerId: adminB.id
     }
   });
@@ -156,6 +162,74 @@ async function main() {
     .expect(200);
 
   assert.ok(exportResponse.text.includes('CASE_VIEWED'));
+
+  const packageDenied = await request(server)
+    .post('/cases/CASE-A-001/package/generate')
+    .set('Authorization', `Bearer ${adminToken}`)
+    .expect(400);
+
+  assert.strictEqual(packageDenied.body.message, 'Checklist incomplete');
+  assert.ok(Array.isArray(packageDenied.body.missing));
+
+  const uploadsRoot = path.join(process.cwd(), 'services', 'uploads', 'tests');
+  await fs.mkdir(uploadsRoot, { recursive: true });
+  const writePdfFixture = async (filePath: string) =>
+    new Promise<void>((resolve, reject) => {
+      const doc = new PDFDocument({ size: [200, 200] });
+      const stream = doc.pipe(createWriteStream(filePath));
+      stream.on('finish', resolve);
+      stream.on('error', reject);
+      doc.fontSize(12).text('Test', 50, 150);
+      doc.end();
+    });
+
+  await Promise.all([
+    writePdfFixture(path.join(uploadsRoot, 'claimant-id.pdf')),
+    writePdfFixture(path.join(uploadsRoot, 'proof-of-ownership.pdf')),
+    writePdfFixture(path.join(uploadsRoot, 'w9.pdf'))
+  ]);
+
+  await prisma.document.createMany({
+    data: [
+      {
+        tenantId: seed.tenantA.id,
+        caseId: seed.caseA.id,
+        caseRef: seed.caseA.caseRef,
+        objectKey: 'tests/claimant-id.pdf',
+        originalFilename: 'claimant-id.pdf',
+        sha256: 'hash-claimant',
+        docType: 'claimant_id',
+        status: 'PENDING'
+      },
+      {
+        tenantId: seed.tenantA.id,
+        caseId: seed.caseA.id,
+        caseRef: seed.caseA.caseRef,
+        objectKey: 'tests/proof-of-ownership.pdf',
+        originalFilename: 'proof-of-ownership.pdf',
+        sha256: 'hash-proof',
+        docType: 'proof_of_ownership',
+        status: 'PENDING'
+      },
+      {
+        tenantId: seed.tenantA.id,
+        caseId: seed.caseA.id,
+        caseRef: seed.caseA.caseRef,
+        objectKey: 'tests/w9.pdf',
+        originalFilename: 'w9.pdf',
+        sha256: 'hash-w9',
+        docType: 'w9',
+        status: 'PENDING'
+      }
+    ]
+  });
+
+  const packageOk = await request(server)
+    .post('/cases/CASE-A-001/package/generate')
+    .set('Authorization', `Bearer ${adminToken}`)
+    .expect(201);
+
+  assert.ok(packageOk.body.artifactId);
 
   const earliestAudit = await prisma.auditLog.findFirst({
     where: { tenantId: seed.tenantA.id },

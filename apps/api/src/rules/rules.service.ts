@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ChecklistGenerator, RulesRegistry } from '@surplus/rules';
 import type { CaseChecklistContext } from '@surplus/rules';
 
@@ -6,6 +6,7 @@ import type { CaseChecklistContext } from '@surplus/rules';
 export class RulesService {
   private registry = new RulesRegistry();
   private checklist = new ChecklistGenerator(this.registry);
+  private readonly phaseOneState = 'CA';
 
   listJurisdictions() {
     return this.registry
@@ -14,6 +15,9 @@ export class RulesService {
   }
 
   getRule(state: string, countyCode: string) {
+    if (state.toUpperCase() !== this.phaseOneState) {
+      throw new BadRequestException('Phase 1 supports California (CA) only');
+    }
     const rule = this.registry.getRule(state, countyCode);
     if (!rule) {
       throw new NotFoundException('Rules not found for jurisdiction');
