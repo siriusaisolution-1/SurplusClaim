@@ -89,8 +89,16 @@ export class CasePackageService {
       const chunks: Buffer[] = [];
       const footerText = `Case ${params.caseRecord.caseRef} • Tenant ${params.tenantId} • ${new Date().toISOString()}`;
 
-      const footer = () => this.renderFooter(doc, footerText);
-      doc.on('pageAdded', footer);
+      const renderFooterOnce = () => {
+        if ((doc as any).__renderingFooter) return;
+        (doc as any).__renderingFooter = true;
+        try {
+          this.renderFooter(doc, footerText);
+        } finally {
+          (doc as any).__renderingFooter = false;
+        }
+      };
+      doc.on('pageAdded', renderFooterOnce);
 
       doc.on('data', (chunk) => chunks.push(chunk as Buffer));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -146,7 +154,7 @@ export class CasePackageService {
         });
       }
 
-      footer();
+      renderFooterOnce();
       doc.end();
     });
   }
