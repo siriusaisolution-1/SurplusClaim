@@ -1,6 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
-
 import { NormalizedCase } from '@surplus/shared';
 
 import { connectorKeyToString } from './registry';
@@ -20,23 +17,13 @@ const EMPTY_STATUS: ConnectorRunStatus = {
   lastError: null
 };
 
-type PersistedStatus = Omit<ConnectorRunStatus, 'lastRun'> & { lastRun?: string };
-
-interface ConnectorStateStoreOptions {
-  persistPath?: string;
-}
-
 export class ConnectorStateStore {
-  private readonly persistPath?: string;
   private readonly statuses = new Map<string, ConnectorRunStatus>();
   private readonly cursors = new Map<string, string | null>();
   private readonly cases = new Map<string, StoredCaseRecord>();
   private readonly audits: ConnectorAuditEvent[] = [];
 
-  constructor(options?: ConnectorStateStoreOptions) {
-    this.persistPath = options?.persistPath ?? process.env.CONNECTOR_STATE_PATH ?? 'connector-state.json';
-    this.load();
-  }
+  constructor() {}
 
   getStatus(connector: ConnectorConfig): ConnectorRunStatus {
     return this.statuses.get(connectorKeyToString(connector.key)) ?? { ...EMPTY_STATUS };
@@ -47,7 +34,6 @@ export class ConnectorStateStore {
     const current = this.getStatus(connector);
     const next = { ...current, ...update } satisfies ConnectorRunStatus;
     this.statuses.set(key, next);
-    this.persist();
     return next;
   }
 
@@ -61,7 +47,6 @@ export class ConnectorStateStore {
 
   setCursor(connector: ConnectorConfig, cursor: string | null): void {
     this.cursors.set(connectorKeyToString(connector.key), cursor);
-    this.persist();
   }
 
   rememberCase(record: StoredCaseRecord): void {
@@ -82,61 +67,6 @@ export class ConnectorStateStore {
 
   listAudits(): ConnectorAuditEvent[] {
     return this.audits;
-  }
-
-  private persist() {
-    if (!this.persistPath) return;
-
-    const dir = path.dirname(this.persistPath);
-    if (dir) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-
-    const statuses = Object.fromEntries(
-      Array.from(this.statuses.entries()).map(([key, status]) => [key, this.serializeStatus(status)])
-    );
-
-    const data = {
-      statuses,
-      cursors: Object.fromEntries(this.cursors.entries())
-    } satisfies Record<string, unknown>;
-
-    fs.writeFileSync(this.persistPath, JSON.stringify(data, null, 2));
-  }
-
-  private load() {
-    if (!this.persistPath || !fs.existsSync(this.persistPath)) return;
-
-    try {
-      const raw = JSON.parse(fs.readFileSync(this.persistPath, 'utf8')) as {
-        statuses?: Record<string, PersistedStatus>;
-        cursors?: Record<string, string | null>;
-      };
-
-      Object.entries(raw.statuses ?? {}).forEach(([key, status]) => {
-        this.statuses.set(key, this.deserializeStatus(status));
-      });
-
-      Object.entries(raw.cursors ?? {}).forEach(([key, cursor]) => {
-        this.cursors.set(key, cursor);
-      });
-    } catch {
-      // ignore malformed persisted state
-    }
-  }
-
-  private serializeStatus(status: ConnectorRunStatus): PersistedStatus {
-    return {
-      ...status,
-      lastRun: status.lastRun ? status.lastRun.toISOString() : undefined
-    };
-  }
-
-  private deserializeStatus(status: PersistedStatus): ConnectorRunStatus {
-    return {
-      ...status,
-      lastRun: status.lastRun ? new Date(status.lastRun) : undefined
-    } satisfies ConnectorRunStatus;
   }
 }
 

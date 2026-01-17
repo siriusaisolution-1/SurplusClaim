@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ConnectorOrchestrator } from './orchestrator';
 import { ConnectorRegistry } from './registry';
+import { InMemoryConnectorRunStore } from './run-store';
 import { ConnectorStateStore } from './state';
 import { ConnectorConfig, ConnectorScrapedItem } from './types';
 
@@ -57,6 +58,7 @@ describe('Connector ingestion pipeline', () => {
     const orchestrator = new ConnectorOrchestrator({
       registry,
       stateStore: state,
+      runStore: new InMemoryConnectorRunStore(),
       scrapydClient: new FakeScrapydClient(items)
     });
 
@@ -94,6 +96,7 @@ describe('Connector ingestion pipeline', () => {
     const orchestrator = new ConnectorOrchestrator({
       registry,
       stateStore: state,
+      runStore: new InMemoryConnectorRunStore(),
       scrapydClient: new FakeScrapydClient(items)
     });
 
