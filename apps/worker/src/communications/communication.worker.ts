@@ -31,6 +31,7 @@ export class CommunicationWorkerService implements OnModuleInit, OnModuleDestroy
 
   private async processPending() {
     const now = new Date();
+    const dryRunEmails = ['true', '1', 'yes'].includes((process.env.DRY_RUN_EMAILS ?? '').toLowerCase());
     const pending = await prisma.communication.findMany({
       where: {
         status: { in: ['pending', 'pending_auto'] },
@@ -44,6 +45,14 @@ export class CommunicationWorkerService implements OnModuleInit, OnModuleDestroy
 
     for (const item of pending) {
       try {
+        if (dryRunEmails) {
+          await prisma.communication.update({
+            where: { id: item.id },
+            data: { status: 'skipped', providerMessageId: 'dry-run' }
+          });
+          this.logger.log(`Skipped communication ${item.id} due to DRY_RUN_EMAILS`);
+          continue;
+        }
         const result = await this.emailProvider.send({
           to: item.recipient ?? '',
           subject: item.subject,

@@ -27,13 +27,26 @@ This runs `prisma migrate deploy` against the configured `DATABASE_URL`.
 - **After schema changes**: re-run `pnpm run deploy:prepare` any time `schema.prisma` changes.
 
 ## Seeding a Beta Tenant
-The seed script creates/updates a demo tenant and admin user in `apps/api/prisma/seed.ts`.
-1. Update the seed details (tenant name, admin email, password) as needed.
+The beta seed script creates/updates the Beta Tenant and two users.
+1. Set required env vars:
+   - `BETA_ADMIN_EMAIL`, `BETA_ADMIN_PASSWORD`
+   - `BETA_REVIEWER_EMAIL`, `BETA_REVIEWER_PASSWORD`
 2. Run:
    ```bash
-   pnpm --filter @surplus/api prisma:seed
+   pnpm seed:beta
    ```
-3. Rotate the seeded password after first login.
+
+## Production Smoke Test
+Run a repeatable smoke test against the API + DB + worker.
+1. Ensure the worker is running (set `DRY_RUN_EMAILS=true` to avoid sending emails).
+2. Set required env vars:
+   - `API_BASE_URL` (e.g. `https://api.example.com/`)
+   - `DATABASE_URL`
+   - `BETA_ADMIN_EMAIL`, `BETA_ADMIN_PASSWORD`
+3. Run:
+   ```bash
+   pnpm smoke:prod
+   ```
 
 ## Health & Readiness Checks
 - **API**:
