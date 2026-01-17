@@ -24,7 +24,7 @@ declare module '@surplus/shared' {
 declare module '@surplus/connectors' {
   export { ConnectorOrchestrator } from '../../../packages/connectors/src/orchestrator';
   export { ConnectorRegistry } from '../../../packages/connectors/src/registry';
-  export { defaultConnectorStateStore } from '../../../packages/connectors/src/state';
+  export { ConnectorStateStore, InMemoryConnectorStateStore, defaultConnectorStateStore } from '../../../packages/connectors/src/state';
 }
 
 declare module '@surplus/audit' {

@@ -11,12 +11,12 @@ export class HealthController {
   ) {}
 
   @Get()
-  getHealth() {
+  async getHealth() {
     return {
       status: 'ok',
       service: 'worker',
       queue: this.queueService.queueName,
-      connectors: this.connectorWorkerService.getStatuses()
+      connectors: await this.connectorWorkerService.getStatuses()
     };
   }
 }

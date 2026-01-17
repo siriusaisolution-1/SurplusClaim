@@ -17,7 +17,20 @@ const EMPTY_STATUS: ConnectorRunStatus = {
   lastError: null
 };
 
-export class ConnectorStateStore {
+export interface ConnectorStateStore {
+  getStatus(connector: ConnectorConfig): Promise<ConnectorRunStatus>;
+  setStatus(connector: ConnectorConfig, update: Partial<ConnectorRunStatus>): Promise<ConnectorRunStatus>;
+  listStatuses(connectors: ConnectorConfig[]): Promise<Array<{ connector: ConnectorConfig; status: ConnectorRunStatus }>>;
+  getCursor(connector: ConnectorConfig): Promise<string | null>;
+  setCursor(connector: ConnectorConfig, cursor: string | null): Promise<void>;
+  rememberCase(record: StoredCaseRecord): Promise<void>;
+  findCase(dedupeKey: string): Promise<StoredCaseRecord | undefined>;
+  listCases(): Promise<StoredCaseRecord[]>;
+  audit(event: ConnectorAuditEvent): Promise<void>;
+  listAudits(): Promise<ConnectorAuditEvent[]>;
+}
+
+export class InMemoryConnectorStateStore implements ConnectorStateStore {
   private readonly statuses = new Map<string, ConnectorRunStatus>();
   private readonly cursors = new Map<string, string | null>();
   private readonly cases = new Map<string, StoredCaseRecord>();
@@ -25,52 +38,55 @@ export class ConnectorStateStore {
 
   constructor() {}
 
-  getStatus(connector: ConnectorConfig): ConnectorRunStatus {
+  async getStatus(connector: ConnectorConfig): Promise<ConnectorRunStatus> {
     return this.statuses.get(connectorKeyToString(connector.key)) ?? { ...EMPTY_STATUS };
   }
 
-  setStatus(connector: ConnectorConfig, update: Partial<ConnectorRunStatus>): ConnectorRunStatus {
+  async setStatus(connector: ConnectorConfig, update: Partial<ConnectorRunStatus>): Promise<ConnectorRunStatus> {
     const key = connectorKeyToString(connector.key);
-    const current = this.getStatus(connector);
+    const current = await this.getStatus(connector);
     const next = { ...current, ...update } satisfies ConnectorRunStatus;
     this.statuses.set(key, next);
     return next;
   }
 
-  listStatuses(connectors: ConnectorConfig[]): Array<{ connector: ConnectorConfig; status: ConnectorRunStatus }> {
-    return connectors.map((connector) => ({ connector, status: this.getStatus(connector) }));
+  async listStatuses(
+    connectors: ConnectorConfig[]
+  ): Promise<Array<{ connector: ConnectorConfig; status: ConnectorRunStatus }>> {
+    const statuses = await Promise.all(connectors.map((connector) => this.getStatus(connector)));
+    return connectors.map((connector, index) => ({ connector, status: statuses[index] }));
   }
 
-  getCursor(connector: ConnectorConfig): string | null {
+  async getCursor(connector: ConnectorConfig): Promise<string | null> {
     return this.cursors.get(connectorKeyToString(connector.key)) ?? null;
   }
 
-  setCursor(connector: ConnectorConfig, cursor: string | null): void {
+  async setCursor(connector: ConnectorConfig, cursor: string | null): Promise<void> {
     this.cursors.set(connectorKeyToString(connector.key), cursor);
   }
 
-  rememberCase(record: StoredCaseRecord): void {
+  async rememberCase(record: StoredCaseRecord): Promise<void> {
     this.cases.set(record.dedupeKey, record);
   }
 
-  findCase(dedupeKey: string): StoredCaseRecord | undefined {
+  async findCase(dedupeKey: string): Promise<StoredCaseRecord | undefined> {
     return this.cases.get(dedupeKey);
   }
 
-  listCases(): StoredCaseRecord[] {
+  async listCases(): Promise<StoredCaseRecord[]> {
     return Array.from(this.cases.values());
   }
 
-  audit(event: ConnectorAuditEvent): void {
+  async audit(event: ConnectorAuditEvent): Promise<void> {
     this.audits.push(event);
   }
 
-  listAudits(): ConnectorAuditEvent[] {
+  async listAudits(): Promise<ConnectorAuditEvent[]> {
     return this.audits;
   }
 }
 
-export const defaultConnectorStateStore = new ConnectorStateStore();
+export const defaultConnectorStateStore = new InMemoryConnectorStateStore();
 
 export interface IngestionResult {
   created: StoredCaseRecord[];
