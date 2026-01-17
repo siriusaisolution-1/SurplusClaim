@@ -90,6 +90,42 @@ export class CommunicationWorkerService implements OnModuleInit, OnModuleDestroy
             this.logger.warn(`Unable to record reminder audit for ${item.caseRef}: ${String(err)}`);
           }
         }
+
+        if (item.templateId === 'submission_status_reminder') {
+          try {
+            await prisma.caseEvent.create({
+              data: {
+                tenantId: item.tenantId,
+                caseId: item.caseId,
+                caseRef: item.caseRef,
+                type: 'SUBMISSION_REMINDER_SENT',
+                payload: {
+                  templateId: item.templateId,
+                  templateVersion: item.templateVersion,
+                  provider: result.provider,
+                  recipient: item.recipient,
+                  sendAt: item.sendAt
+                }
+              }
+            });
+
+            await this.auditEngine.append({
+              tenantId: item.tenantId,
+              caseId: item.caseId,
+              caseRef: item.caseRef,
+              eventType: 'SUBMISSION_REMINDER_SENT',
+              actor: 'system',
+              payload: {
+                communicationId: item.id,
+                provider: result.provider,
+                recipient: item.recipient,
+                sendAt: item.sendAt
+              }
+            });
+          } catch (err) {
+            this.logger.warn(`Unable to record submission reminder audit for ${item.caseRef}: ${String(err)}`);
+          }
+        }
         this.logger.log(`Sent communication ${item.id} via ${result.provider}`);
       } catch (error) {
         const message = error instanceof Error ? error.message : 'unknown';

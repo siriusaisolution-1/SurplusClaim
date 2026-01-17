@@ -7,6 +7,7 @@
     "dev": "pnpm -r --filter './apps/**' dev",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
+    "typecheck": "pnpm --filter @surplus/api exec prisma generate --schema ./prisma/schema.prisma && pnpm exec tsc -p apps/api/tsconfig.json --noEmit && pnpm exec tsc -p apps/worker/tsconfig.json --noEmit && pnpm exec tsc -p apps/web/tsconfig.json --noEmit",
     "format": "pnpm -r format",
     "build:web": "pnpm --filter @surplus/web build",
     "dev:web": "pnpm --filter @surplus/web dev",

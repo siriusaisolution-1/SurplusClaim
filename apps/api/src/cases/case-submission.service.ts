@@ -50,14 +50,21 @@ export class CaseSubmissionService {
       docType: 'submission_evidence'
     });
 
+    const submissionStatuses: CaseStatus[] = [
+      CaseStatus.SUBMITTED_BY_CLIENT,
+      CaseStatus.SUBMITTED_BY_PARTNER,
+      CaseStatus.AWAITING_RESPONSE,
+      CaseStatus.SUBMITTED
+    ];
+
     let transitionedCase = caseRecord;
-    if (caseRecord.status !== CaseStatus.SUBMITTED) {
+    if (!submissionStatuses.includes(caseRecord.status)) {
       const allowed = this.casesService.getAllowedTransitions(caseRecord.status);
-      if (!allowed.includes(CaseStatus.SUBMITTED)) {
+      if (!allowed.includes(CaseStatus.SUBMITTED_BY_PARTNER)) {
         throw new BadRequestException('Case cannot be marked submitted from the current state');
       }
       transitionedCase = await this.casesService.transitionCase(input.tenantId, input.actorId, input.caseRef, {
-        toState: CaseStatus.SUBMITTED,
+        toState: CaseStatus.SUBMITTED_BY_PARTNER,
         reason: 'manual_submission_with_evidence'
       });
     }
@@ -101,4 +108,3 @@ export class CaseSubmissionService {
     };
   }
 }
-
