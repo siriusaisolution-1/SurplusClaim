@@ -24,7 +24,7 @@ export class LoggingInterceptor implements NestInterceptor {
     request.requestId = requestId;
     response.setHeader('X-Request-Id', requestId);
 
-    const caseRef = extractCaseRef(request);
+    const caseRef = request.caseRef ?? extractCaseRef(request);
     const tenantId = request.user?.tenantId ?? request.headers['x-tenant-id'];
     const startedAt = Date.now();
 
@@ -43,6 +43,8 @@ export class LoggingInterceptor implements NestInterceptor {
         this.logger.log({
           event: 'request_completed',
           requestId,
+          path: request.originalUrl,
+          method: request.method,
           durationMs: Date.now() - startedAt,
           statusCode: response.statusCode,
           tenantId,
@@ -55,6 +57,8 @@ export class LoggingInterceptor implements NestInterceptor {
           {
             event: 'request_failed',
             requestId,
+            path: request.originalUrl,
+            method: request.method,
             durationMs: Date.now() - startedAt,
             tenantId,
             caseRef,

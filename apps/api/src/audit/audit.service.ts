@@ -29,7 +29,15 @@ export class AuditService {
         caseId: params.caseId ?? null
       });
     } catch (error) {
-      this.logger.error('Failed to append to audit log', error as Error);
+      this.logger.error(
+        {
+          event: 'audit_append_failed',
+          tenantId: params.tenantId,
+          caseRef: params.caseRef,
+          message: 'Failed to append to audit log'
+        },
+        error instanceof Error ? error.stack : undefined
+      );
     }
   }
 
