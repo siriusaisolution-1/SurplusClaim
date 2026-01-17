@@ -1,13 +1,13 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConnectorOrchestrator } from '@surplus/connectors';
 
 import { PrismaConnectorRunStore } from './connectors/connector-run.store';
 import { PrismaConnectorStateStore } from './connectors/connector-state.store';
+import { StructuredLoggerService } from './observability/structured-logger.service';
 import { prisma } from './prisma.client';
 
 @Injectable()
 export class ConnectorWorkerService implements OnModuleInit {
-  private readonly logger = new Logger(ConnectorWorkerService.name);
   private readonly orchestrator: ConnectorOrchestrator;
   private timer?: NodeJS.Timeout;
   private isRunning = false;
@@ -15,16 +15,18 @@ export class ConnectorWorkerService implements OnModuleInit {
   private readonly pollIntervalMs = Number(process.env.CONNECTOR_POLL_INTERVAL ?? 300_000);
   private readonly retryAttempts = Number(process.env.CONNECTOR_MAX_ATTEMPTS ?? 3);
   private readonly retryBaseDelayMs = Number(process.env.CONNECTOR_RETRY_DELAY ?? 5_000);
+  private readonly tenantId: string;
 
-  constructor() {
-    const tenantId = process.env.CONNECTOR_TENANT_ID;
-    if (!tenantId) {
+  constructor(private readonly logger: StructuredLoggerService) {
+    const configuredTenantId = process.env.CONNECTOR_TENANT_ID;
+    if (!configuredTenantId) {
       throw new Error('CONNECTOR_TENANT_ID must be set for connector run persistence.');
     }
+    this.tenantId = configuredTenantId;
 
     this.orchestrator = new ConnectorOrchestrator({
-      runStore: new PrismaConnectorRunStore(prisma, tenantId),
-      stateStore: new PrismaConnectorStateStore(prisma, tenantId)
+      runStore: new PrismaConnectorRunStore(prisma, configuredTenantId),
+      stateStore: new PrismaConnectorStateStore(prisma, configuredTenantId)
     });
   }
 
@@ -42,13 +44,22 @@ export class ConnectorWorkerService implements OnModuleInit {
         baseDelayMs: this.retryBaseDelayMs
       });
       this.failureCount = 0;
-      this.logger.log(`Completed connector poll: ${results.length} connectors processed`);
+      this.logger.log({
+        event: 'connector_poll_completed',
+        tenantId: this.tenantId,
+        processedCount: results.length
+      });
       this.scheduleNext(this.pollIntervalMs);
     } catch (error) {
       this.failureCount += 1;
       const message = error instanceof Error ? error.message : 'unknown error';
       const delay = Math.min(this.pollIntervalMs, this.retryBaseDelayMs * 2 ** (this.failureCount - 1));
-      this.logger.error(`Connector poll failed: ${message}; retrying in ${delay}ms`);
+      this.logger.error({
+        event: 'connector_poll_failed',
+        tenantId: this.tenantId,
+        message,
+        retryDelayMs: delay
+      });
       this.scheduleNext(delay);
     } finally {
       this.isRunning = false;

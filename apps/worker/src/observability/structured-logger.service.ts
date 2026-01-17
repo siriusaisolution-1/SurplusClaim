@@ -1,15 +1,11 @@
 import { Injectable, LoggerService } from '@nestjs/common';
 
-import { redactPII } from './redaction';
-
 type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 type LogPayload = {
   event?: string;
   requestId?: string | null;
   tenantId?: string | null;
   caseRef?: string | null;
-  path?: string;
-  method?: string;
   [key: string]: unknown;
 };
 
@@ -33,15 +29,7 @@ export class StructuredLoggerService implements LoggerService {
 
   private write(level: LogLevel, message: unknown, context?: string, trace?: string) {
     const base = typeof message === 'object' && message !== null ? (message as LogPayload) : {};
-    const {
-      event,
-      requestId = null,
-      tenantId = null,
-      caseRef = null,
-      path,
-      method,
-      ...rest
-    } = base;
+    const { event, requestId = null, tenantId = null, caseRef = null, ...rest } = base;
     const payload: Record<string, unknown> = {
       timestamp: new Date().toISOString(),
       level,
@@ -49,11 +37,9 @@ export class StructuredLoggerService implements LoggerService {
       requestId,
       tenantId,
       caseRef,
-      ...(path ? { path } : {}),
-      ...(method ? { method } : {}),
       message: typeof message === 'string' ? message : undefined,
       context,
-      data: typeof message === 'string' ? undefined : redactPII(rest),
+      data: typeof message === 'string' ? undefined : rest,
       ...(trace ? { trace } : {})
     };
 

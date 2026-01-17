@@ -1,21 +1,25 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { CaseStatus, CommunicationChannel, CommunicationDirection, Prisma } from '@prisma/client';
 import { AuditEngine } from '@surplus/audit';
 import { templateRegistry } from '@surplus/shared';
 
+import { StructuredLoggerService } from '../observability/structured-logger.service';
 import { prisma } from '../prisma.client';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_SCAN_INTERVAL_MS = DAY_MS;
 const DEFAULT_SUBMISSION_REMINDER_DAYS = 7;
+const DEFAULT_DAILY_COMMS_CAP = 200;
+const DEFAULT_DAILY_AUTO_REMINDERS_CAP = 50;
 
 type ProceduralDeadline = { name: string; dueDate: Date };
 
 @Injectable()
 export class ReminderWorkerService implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(ReminderWorkerService.name);
   private readonly auditEngine = new AuditEngine(prisma);
   private timer?: NodeJS.Timeout;
+
+  constructor(private readonly logger: StructuredLoggerService) {}
 
   async onModuleInit() {
     await this.scanAndSchedule();
@@ -56,7 +60,11 @@ export class ReminderWorkerService implements OnModuleInit, OnModuleDestroy {
       const replyTo = process.env.DEFAULT_REMINDER_REPLY_TO ?? recipientEmail;
 
       if (!recipientEmail || !replyTo) {
-        this.logger.warn(`Skipping reminder for ${caseRecord.caseRef} because recipient or reply-to is missing`);
+        this.logger.warn({
+          event: 'reminder_skipped_missing_recipient',
+          tenantId: caseRecord.tenantId,
+          caseRef: caseRecord.caseRef
+        });
         continue;
       }
 
@@ -85,6 +93,17 @@ export class ReminderWorkerService implements OnModuleInit, OnModuleDestroy {
       };
 
       try {
+        const capBlock = await this.checkCaps(caseRecord.tenantId);
+        if (capBlock) {
+          await this.recordCapBlock({
+            tenantId: caseRecord.tenantId,
+            caseId: caseRecord.id,
+            caseRef: caseRecord.caseRef,
+            capBlock,
+            templateId: 'deadline_reminder'
+          });
+          continue;
+        }
         const rendered = templateRegistry.render('deadline_reminder', variables);
         const communication = await prisma.communication.create({
           data: {
@@ -134,10 +153,21 @@ export class ReminderWorkerService implements OnModuleInit, OnModuleDestroy {
           }
         });
 
-        this.logger.log(`Scheduled deadline reminder for ${caseRecord.caseRef} (${next.name})`);
+        this.logger.log({
+          event: 'deadline_reminder_scheduled',
+          tenantId: caseRecord.tenantId,
+          caseRef: caseRecord.caseRef,
+          deadlineName: next.name,
+          sendAt: sendAt.toISOString()
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'unknown';
-        this.logger.error(`Failed to schedule reminder for ${caseRecord.caseRef}: ${message}`);
+        this.logger.error({
+          event: 'deadline_reminder_failed',
+          tenantId: caseRecord.tenantId,
+          caseRef: caseRecord.caseRef,
+          message
+        });
       }
     }
   }
@@ -165,7 +195,11 @@ export class ReminderWorkerService implements OnModuleInit, OnModuleDestroy {
       const replyTo = process.env.DEFAULT_REMINDER_REPLY_TO ?? recipientEmail;
 
       if (!recipientEmail || !replyTo) {
-        this.logger.warn(`Skipping submission reminder for ${caseRecord.caseRef} because recipient or reply-to is missing`);
+        this.logger.warn({
+          event: 'submission_reminder_skipped_missing_recipient',
+          tenantId: caseRecord.tenantId,
+          caseRef: caseRecord.caseRef
+        });
         continue;
       }
 
@@ -189,6 +223,17 @@ export class ReminderWorkerService implements OnModuleInit, OnModuleDestroy {
       };
 
       try {
+        const capBlock = await this.checkCaps(caseRecord.tenantId);
+        if (capBlock) {
+          await this.recordCapBlock({
+            tenantId: caseRecord.tenantId,
+            caseId: caseRecord.id,
+            caseRef: caseRecord.caseRef,
+            capBlock,
+            templateId: 'submission_status_reminder'
+          });
+          continue;
+        }
         const rendered = templateRegistry.render('submission_status_reminder', variables);
         const communication = await prisma.$transaction(async (tx) => {
           const created = await tx.communication.create({
@@ -246,11 +291,95 @@ export class ReminderWorkerService implements OnModuleInit, OnModuleDestroy {
           }
         });
 
-        this.logger.log(`Scheduled submission reminder for ${caseRecord.caseRef} (${statusLabel})`);
+        this.logger.log({
+          event: 'submission_reminder_scheduled',
+          tenantId: caseRecord.tenantId,
+          caseRef: caseRecord.caseRef,
+          statusLabel,
+          sendAt: sendAt.toISOString()
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'unknown';
-        this.logger.error(`Failed to schedule submission reminder for ${caseRecord.caseRef}: ${message}`);
+        this.logger.error({
+          event: 'submission_reminder_failed',
+          tenantId: caseRecord.tenantId,
+          caseRef: caseRecord.caseRef,
+          message
+        });
       }
+    }
+  }
+
+  private async checkCaps(tenantId: string) {
+    const commsCapRaw = Number(process.env.TENANT_DAILY_COMMS_CAP ?? DEFAULT_DAILY_COMMS_CAP);
+    const autoCapRaw = Number(process.env.TENANT_DAILY_AUTO_REMINDERS_CAP ?? DEFAULT_DAILY_AUTO_REMINDERS_CAP);
+    const commsCap = Number.isFinite(commsCapRaw) ? commsCapRaw : DEFAULT_DAILY_COMMS_CAP;
+    const autoCap = Number.isFinite(autoCapRaw) ? autoCapRaw : DEFAULT_DAILY_AUTO_REMINDERS_CAP;
+    const { start, end } = this.getDayWindow();
+
+    const [commsCount, autoCount] = await Promise.all([
+      prisma.communication.count({
+        where: { tenantId, createdAt: { gte: start, lt: end } }
+      }),
+      prisma.communication.count({
+        where: { tenantId, status: 'pending_auto', createdAt: { gte: start, lt: end } }
+      })
+    ]);
+
+    if (commsCount >= commsCap) {
+      return { capType: 'tenant_daily_comms', cap: commsCap, count: commsCount };
+    }
+
+    if (autoCount >= autoCap) {
+      return { capType: 'tenant_daily_auto_reminders', cap: autoCap, count: autoCount };
+    }
+
+    return null;
+  }
+
+  private async recordCapBlock(params: {
+    tenantId: string;
+    caseId: string;
+    caseRef: string;
+    capBlock: { capType: string; cap: number; count: number };
+    templateId: string;
+  }) {
+    const { start, end } = this.getDayWindow();
+    this.logger.warn({
+      event: 'reminder_blocked_cap',
+      tenantId: params.tenantId,
+      caseRef: params.caseRef,
+      capType: params.capBlock.capType,
+      cap: params.capBlock.cap,
+      count: params.capBlock.count,
+      templateId: params.templateId
+    });
+
+    const existing = await prisma.caseEvent.findFirst({
+      where: {
+        tenantId: params.tenantId,
+        caseId: params.caseId,
+        type: 'REMINDER_BLOCKED_CAP',
+        createdAt: { gte: start, lt: end }
+      }
+    });
+
+    if (!existing) {
+      await prisma.caseEvent.create({
+        data: {
+          tenantId: params.tenantId,
+          caseId: params.caseId,
+          caseRef: params.caseRef,
+          type: 'REMINDER_BLOCKED_CAP',
+          payload: {
+            capType: params.capBlock.capType,
+            cap: params.capBlock.cap,
+            count: params.capBlock.count,
+            templateId: params.templateId,
+            blockedAt: new Date().toISOString()
+          }
+        }
+      });
     }
   }
 
@@ -291,5 +420,11 @@ export class ReminderWorkerService implements OnModuleInit, OnModuleDestroy {
       return now;
     }
     return threeDaysBefore;
+  }
+
+  private getDayWindow(date = new Date()) {
+    const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const end = new Date(start.getTime() + DAY_MS);
+    return { start, end };
   }
 }

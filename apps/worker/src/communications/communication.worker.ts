@@ -1,8 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { CommunicationDirection, CommunicationChannel } from '@prisma/client';
 import { AuditEngine } from '@surplus/audit';
 
 import { prisma } from '../prisma.client';
+import { StructuredLoggerService } from '../observability/structured-logger.service';
 
 import { buildEmailProvider } from './email.provider';
 
@@ -10,10 +11,11 @@ const DEFAULT_POLL_MS = 60_000;
 
 @Injectable()
 export class CommunicationWorkerService implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(CommunicationWorkerService.name);
   private readonly emailProvider = buildEmailProvider();
   private readonly auditEngine = new AuditEngine(prisma);
   private timer?: NodeJS.Timeout;
+
+  constructor(private readonly logger: StructuredLoggerService) {}
 
   async onModuleInit() {
     await this.processPending();
@@ -50,7 +52,13 @@ export class CommunicationWorkerService implements OnModuleInit, OnModuleDestroy
             where: { id: item.id },
             data: { status: 'skipped', providerMessageId: 'dry-run' }
           });
-          this.logger.log(`Skipped communication ${item.id} due to DRY_RUN_EMAILS`);
+          this.logger.log({
+            event: 'communication_skipped',
+            tenantId: item.tenantId,
+            caseRef: item.caseRef,
+            communicationId: item.id,
+            reason: 'dry_run'
+          });
           continue;
         }
         const result = await this.emailProvider.send({
@@ -96,7 +104,13 @@ export class CommunicationWorkerService implements OnModuleInit, OnModuleDestroy
               }
             });
           } catch (err) {
-            this.logger.warn(`Unable to record reminder audit for ${item.caseRef}: ${String(err)}`);
+            this.logger.warn({
+              event: 'reminder_audit_failed',
+              tenantId: item.tenantId,
+              caseRef: item.caseRef,
+              communicationId: item.id,
+              message: String(err)
+            });
           }
         }
 
@@ -132,17 +146,35 @@ export class CommunicationWorkerService implements OnModuleInit, OnModuleDestroy
               }
             });
           } catch (err) {
-            this.logger.warn(`Unable to record submission reminder audit for ${item.caseRef}: ${String(err)}`);
+            this.logger.warn({
+              event: 'submission_reminder_audit_failed',
+              tenantId: item.tenantId,
+              caseRef: item.caseRef,
+              communicationId: item.id,
+              message: String(err)
+            });
           }
         }
-        this.logger.log(`Sent communication ${item.id} via ${result.provider}`);
+        this.logger.log({
+          event: 'communication_sent',
+          tenantId: item.tenantId,
+          caseRef: item.caseRef,
+          communicationId: item.id,
+          provider: result.provider
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'unknown';
         await prisma.communication.update({
           where: { id: item.id },
           data: { status: 'failed' }
         });
-        this.logger.error(`Failed to send communication ${item.id}: ${message}`);
+        this.logger.error({
+          event: 'communication_send_failed',
+          tenantId: item.tenantId,
+          caseRef: item.caseRef,
+          communicationId: item.id,
+          message
+        });
       }
     }
   }

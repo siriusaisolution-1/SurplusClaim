@@ -36,6 +36,8 @@ export class HealthController {
       });
     }
 
+    await this.ensureMigrationsApplied();
+
     const communicationInterval = Number(process.env.COMMUNICATION_POLL_INTERVAL ?? DEFAULT_COMMUNICATION_POLL_MS);
     const reminderInterval = Number(process.env.DEADLINE_SCAN_INTERVAL_MS ?? DEFAULT_DEADLINE_SCAN_INTERVAL_MS);
 
@@ -64,5 +66,24 @@ export class HealthController {
         reminderIntervalMs: reminderInterval
       }
     };
+  }
+
+  private async ensureMigrationsApplied() {
+    try {
+      const result = await prisma.$queryRawUnsafe<{ count: number }[]>(
+        'SELECT COUNT(*)::int AS count FROM "_prisma_migrations" WHERE finished_at IS NULL'
+      );
+      if ((result?.[0]?.count ?? 0) > 0) {
+        throw new ServiceUnavailableException({
+          status: 'error',
+          service: 'worker',
+          message: 'Pending migrations detected'
+        });
+      }
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+    }
   }
 }

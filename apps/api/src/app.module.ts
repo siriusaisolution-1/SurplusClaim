@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 
 import { AuditController } from './audit/audit.controller';
@@ -31,6 +31,7 @@ import { FeeCalculatorService } from './payouts/fee-calculator.service';
 import { LegalSafetyService } from './safety/legal-safety.service';
 import { LoggingInterceptor } from './observability/logging.interceptor';
 import { StructuredLoggerService } from './observability/structured-logger.service';
+import { RequestContextMiddleware } from './observability/request-context.middleware';
 
 @Module({
   imports: [ConnectorsModule],
@@ -77,4 +78,8 @@ import { StructuredLoggerService } from './observability/structured-logger.servi
     }
   ]
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestContextMiddleware).forRoutes('*');
+  }
+}
