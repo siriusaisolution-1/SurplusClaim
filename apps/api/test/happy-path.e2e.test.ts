@@ -2,7 +2,6 @@ import assert from 'node:assert';
 import crypto from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import PDFDocument from 'pdfkit';
 import request from 'supertest';
 import { validateCaseRef } from '@surplus/shared';
 import { AppModule } from '../src/app.module';
@@ -16,16 +15,8 @@ async function bootstrapApp(): Promise<INestApplication> {
   return app;
 }
 
-async function createPdfBuffer(label: string) {
-  return new Promise<Buffer>((resolve, reject) => {
-    const doc = new PDFDocument({ size: [200, 200] });
-    const chunks: Buffer[] = [];
-    doc.on('data', (chunk) => chunks.push(chunk as Buffer));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
-    doc.fontSize(12).text(label, 20, 80);
-    doc.end();
-  });
+function createPdfBuffer(label: string) {
+  return Buffer.from(`%PDF-1.4\n${label}\n%%EOF`, 'utf8');
 }
 
 async function main() {

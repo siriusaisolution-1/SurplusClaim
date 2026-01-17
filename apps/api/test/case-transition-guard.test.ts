@@ -117,6 +117,12 @@ async function main() {
       `UPDATE "Case" SET "legalExecutionMode" = NULL WHERE "id" = '${caseWithoutLegalExecution.id}';`
     );
 
+    const fetchedWithoutLegalExecution = await casesService.findByCaseRef(
+      tenant.id,
+      caseWithoutLegalExecution.caseRef
+    );
+    assert.strictEqual(fetchedWithoutLegalExecution?.caseRef, caseWithoutLegalExecution.caseRef);
+
     await prisma.payout.create({
       data: {
         tenantId: tenant.id,
