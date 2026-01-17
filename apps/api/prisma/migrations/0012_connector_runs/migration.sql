@@ -3,7 +3,7 @@ CREATE TYPE "ConnectorRunStatus" AS ENUM ('QUEUED', 'RUNNING', 'SUCCESS', 'FAILE
 
 -- CreateTable
 CREATE TABLE "ConnectorRun" (
-    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "id" UUID NOT NULL PRIMARY KEY,
     "tenantId" UUID NOT NULL,
     "connectorId" TEXT NOT NULL,
     "state" TEXT NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE "ConnectorRun" (
 
 -- CreateTable
 CREATE TABLE "ConnectorCursor" (
-    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "id" UUID NOT NULL PRIMARY KEY,
     "tenantId" UUID NOT NULL,
     "connectorId" TEXT NOT NULL,
     "state" TEXT NOT NULL,
