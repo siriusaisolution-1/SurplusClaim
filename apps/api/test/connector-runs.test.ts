@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 
 import { ConnectorRunStatus, PrismaClient } from '@prisma/client';
-import { ConnectorOrchestrator, ConnectorRegistry, ConnectorScrapedItem, ConnectorStateStore } from '@surplus/connectors';
+import { ConnectorOrchestrator, ConnectorRegistry, ConnectorScrapedItem, InMemoryConnectorStateStore } from '@surplus/connectors';
 import { generateCaseRef } from '@surplus/shared';
 
 import { prisma } from '../src/prisma/prisma.client';
@@ -167,7 +167,7 @@ async function run() {
 
   const scrapyd = new FakeScrapydClient([items, secondBatch, invalidBatch]);
   const registry = new ConnectorRegistry([connector]);
-  const stateStore = new ConnectorStateStore();
+  const stateStore = new InMemoryConnectorStateStore();
   const runStore = new PrismaConnectorRunStore(prisma, tenant.id);
 
   const orchestrator = new ConnectorOrchestrator({

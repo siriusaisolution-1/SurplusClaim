@@ -84,8 +84,12 @@ export class ConnectorOrchestrator {
     }
   }
 
-  private audit(connector: ConnectorConfig, event: ConnectorAuditEvent['event'], payload?: Record<string, unknown>) {
-    this.state.audit({ event, at: new Date(), connector: connector.key, payload });
+  private async audit(
+    connector: ConnectorConfig,
+    event: ConnectorAuditEvent['event'],
+    payload?: Record<string, unknown>
+  ) {
+    await this.state.audit({ event, at: new Date(), connector: connector.key, payload });
   }
 
   async runConnector(
@@ -95,7 +99,7 @@ export class ConnectorOrchestrator {
     const startedAt = new Date();
     const previousCursor = await this.runs.getLatestCursor(connector);
 
-    this.audit(connector, 'connector_run_started', { cursor: previousCursor });
+    await this.audit(connector, 'connector_run_started', { cursor: previousCursor });
 
     const attemptCount = (context?.attemptCount ?? 0) + 1;
     const runRecord = context?.runId
@@ -123,11 +127,11 @@ export class ConnectorOrchestrator {
       });
 
       const items = await this.scrapyd.fetchItems(jobId);
-      const ingestion = this.ingestion.ingestBatch(connector, items);
+      const ingestion = await this.ingestion.ingestBatch(connector, items);
       const cursor = ingestion.cursor ?? previousCursor ?? null;
 
       if (ingestion.failures.length > 0) {
-        this.audit(connector, 'connector_run_finished', {
+        await this.audit(connector, 'connector_run_finished', {
           jobId,
           extracted: items.length,
           created: ingestion.created.length,
@@ -173,8 +177,8 @@ export class ConnectorOrchestrator {
         attemptCount
       });
 
-      this.state.setCursor(connector, cursor);
-      this.state.setStatus(connector, {
+      await this.state.setCursor(connector, cursor);
+      await this.state.setStatus(connector, {
         lastRun: startedAt,
         lastCursor: cursor,
         lastJobId: jobId,
@@ -184,7 +188,7 @@ export class ConnectorOrchestrator {
         lastError: ingestion.failures.length > 0 ? 'ingestion failures' : null
       });
 
-      this.audit(connector, 'connector_run_finished', {
+      await this.audit(connector, 'connector_run_finished', {
         jobId,
         extracted: items.length,
         created: ingestion.created.length,
@@ -192,7 +196,7 @@ export class ConnectorOrchestrator {
       });
 
       if (ingestion.created.length > 0) {
-        this.audit(connector, 'cases_created', {
+        await this.audit(connector, 'cases_created', {
           jobId,
           case_refs: ingestion.created.map((created) => created.caseRef),
           count: ingestion.created.length
@@ -202,10 +206,9 @@ export class ConnectorOrchestrator {
       return { jobId, runId: runRecord.id, attemptCount };
     } catch (error) {
       if (error instanceof IngestionError) {
-        this.state.setCursor(connector, error.details.cursor);
-        this.state.setStatus(connector, {
+        await this.state.setStatus(connector, {
           lastRun: startedAt,
-          lastCursor: error.details.cursor,
+          lastCursor: previousCursor ?? null,
           lastJobId: error.details.jobId,
           extracted: error.details.extracted,
           created: error.details.created,
@@ -229,19 +232,19 @@ export class ConnectorOrchestrator {
         },
         attemptCount
       });
-      this.state.setStatus(connector, {
+      await this.state.setStatus(connector, {
         lastRun: startedAt,
         extracted: 0,
         created: 0,
         failures: 1,
         lastError: message
       });
-      this.audit(connector, 'connector_run_finished', { error: message });
+      await this.audit(connector, 'connector_run_finished', { error: message });
       throw error;
     }
   }
 
-  getStatuses() {
+  async getStatuses() {
     return this.state.listStatuses(this.registry.list());
   }
 

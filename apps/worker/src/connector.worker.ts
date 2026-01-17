@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConnectorOrchestrator } from '@surplus/connectors';
 
 import { PrismaConnectorRunStore } from './connectors/connector-run.store';
+import { PrismaConnectorStateStore } from './connectors/connector-state.store';
 import { prisma } from './prisma.client';
 
 @Injectable()
@@ -22,7 +23,8 @@ export class ConnectorWorkerService implements OnModuleInit {
     }
 
     this.orchestrator = new ConnectorOrchestrator({
-      runStore: new PrismaConnectorRunStore(prisma, tenantId)
+      runStore: new PrismaConnectorRunStore(prisma, tenantId),
+      stateStore: new PrismaConnectorStateStore(prisma, tenantId)
     });
   }
 
@@ -53,7 +55,7 @@ export class ConnectorWorkerService implements OnModuleInit {
     }
   }
 
-  getStatuses() {
+  async getStatuses() {
     return this.orchestrator.getStatuses();
   }
 

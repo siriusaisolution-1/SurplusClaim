@@ -77,14 +77,14 @@ export class CaseIngestionService {
     };
   }
 
-  ingestBatch(connector: ConnectorConfig, items: ConnectorScrapedItem[]): IngestionResult {
+  async ingestBatch(connector: ConnectorConfig, items: ConnectorScrapedItem[]): Promise<IngestionResult> {
     const result: IngestionResult = { created: [], skipped: [], failures: [] };
 
     for (const item of items) {
       try {
         const rawSha = item.raw_sha256 ?? this.computeSha(item.raw);
         const dedupeKey = this.dedupeKey(item, rawSha);
-        const existing = this.store.findCase(dedupeKey);
+        const existing = await this.store.findCase(dedupeKey);
 
         if (existing) {
           result.skipped.push(existing);
@@ -105,7 +105,7 @@ export class CaseIngestionService {
           connector: connector.key
         });
 
-        this.store.rememberCase(record);
+        await this.store.rememberCase(record);
         result.created.push(record);
         result.cursor = item.cursor ?? result.cursor ?? null;
       } catch (error) {
