@@ -58,6 +58,13 @@ enum LegalExecutionMode {
   OPS_DIRECT
 }
 
+enum ConnectorRunStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
 model Tenant {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name        String
@@ -77,6 +84,8 @@ model Tenant {
   payouts         Payout[]
   sessions        Session[]
   attorneys       Attorney[]
+  connectorRuns   ConnectorRun[]
+  connectorCursors ConnectorCursor[]
 
   @@unique([name])
 }
@@ -363,4 +372,41 @@ model Session {
 
   @@index([tenantId, userId], map: "Session_tenantId_userId_idx")
   @@unique([refreshTokenHash], map: "Session_refreshTokenHash_key")
+}
+
+model ConnectorRun {
+  id           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String            @db.Uuid
+  connectorId  String
+  state        String
+  countyCode   String
+  status       ConnectorRunStatus
+  attemptCount Int               @default(0)
+  startedAt    DateTime          @db.Timestamptz
+  finishedAt   DateTime?         @db.Timestamptz
+  errorMessage String?
+  cursor       Json?
+  stats        Json?
+  createdAt    DateTime          @default(now()) @db.Timestamptz
+  updatedAt    DateTime          @updatedAt @db.Timestamptz
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([tenantId, connectorId, createdAt(sort: Desc)], map: "connector_run_tenant_connector_created_idx")
+  @@index([tenantId, connectorId, status], map: "connector_run_tenant_connector_status_idx")
+}
+
+model ConnectorCursor {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @db.Uuid
+  connectorId String
+  state       String
+  countyCode  String
+  cursor      Json?
+  createdAt   DateTime @default(now()) @db.Timestamptz
+  updatedAt   DateTime @updatedAt @db.Timestamptz
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tenantId, connectorId, state, countyCode], map: "connector_cursor_unique")
 }

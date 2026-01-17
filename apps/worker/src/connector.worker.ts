@@ -1,16 +1,30 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConnectorOrchestrator } from '@surplus/connectors';
 
+import { PrismaConnectorRunStore } from './connectors/connector-run.store';
+import { prisma } from './prisma.client';
+
 @Injectable()
 export class ConnectorWorkerService implements OnModuleInit {
   private readonly logger = new Logger(ConnectorWorkerService.name);
-  private readonly orchestrator = new ConnectorOrchestrator();
+  private readonly orchestrator: ConnectorOrchestrator;
   private timer?: NodeJS.Timeout;
   private isRunning = false;
   private failureCount = 0;
   private readonly pollIntervalMs = Number(process.env.CONNECTOR_POLL_INTERVAL ?? 300_000);
   private readonly retryAttempts = Number(process.env.CONNECTOR_MAX_ATTEMPTS ?? 3);
   private readonly retryBaseDelayMs = Number(process.env.CONNECTOR_RETRY_DELAY ?? 5_000);
+
+  constructor() {
+    const tenantId = process.env.CONNECTOR_TENANT_ID;
+    if (!tenantId) {
+      throw new Error('CONNECTOR_TENANT_ID must be set for connector run persistence.');
+    }
+
+    this.orchestrator = new ConnectorOrchestrator({
+      runStore: new PrismaConnectorRunStore(prisma, tenantId)
+    });
+  }
 
   async onModuleInit() {
     await this.runCycle();
