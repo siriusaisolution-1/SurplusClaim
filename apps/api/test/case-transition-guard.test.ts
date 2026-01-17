@@ -39,11 +39,38 @@ async function main() {
       data: { tenantId: tenant.id, fullName: 'Ada Counsel', email: 'ada@example.com' }
     });
 
+    const submissionCase = await prisma.case.create({
+      data: {
+        tenantId: tenant.id,
+        caseRef: 'CASE-GUARD-SUBMISSION',
+        status: CaseStatus.PACKAGE_READY,
+        tierSuggested: TierLevel.LOW
+      }
+    });
+
+    const submittedByClient = await casesService.transitionCase(
+      tenant.id,
+      actor.id,
+      submissionCase.caseRef,
+      { toState: CaseStatus.SUBMITTED_BY_CLIENT }
+    );
+
+    assert.strictEqual(submittedByClient.status, CaseStatus.SUBMITTED_BY_CLIENT);
+
+    const awaitingResponse = await casesService.transitionCase(
+      tenant.id,
+      actor.id,
+      submissionCase.caseRef,
+      { toState: CaseStatus.AWAITING_RESPONSE }
+    );
+
+    assert.strictEqual(awaitingResponse.status, CaseStatus.AWAITING_RESPONSE);
+
     const caseWithoutAttorney = await prisma.case.create({
       data: {
         tenantId: tenant.id,
         caseRef: 'CASE-GUARD-1',
-        status: CaseStatus.SUBMITTED,
+        status: CaseStatus.AWAITING_RESPONSE,
         tierSuggested: TierLevel.LOW,
         legalExecutionMode: LegalExecutionMode.ATTORNEY_REQUIRED,
         expectedPayoutWindow: '2030-01-01T00:00:00.000Z',
@@ -79,7 +106,7 @@ async function main() {
       data: {
         tenantId: tenant.id,
         caseRef: 'CASE-GUARD-NO-LEGAL',
-        status: CaseStatus.SUBMITTED,
+        status: CaseStatus.AWAITING_RESPONSE,
         tierSuggested: TierLevel.LOW,
         legalExecutionMode: LegalExecutionMode.OPS_DIRECT,
         expectedPayoutWindow: '2030-01-01T00:00:00.000Z',
@@ -123,7 +150,7 @@ async function main() {
       data: {
         tenantId: tenant.id,
         caseRef: 'CASE-GUARD-NO-EVIDENCE',
-        status: CaseStatus.SUBMITTED,
+        status: CaseStatus.AWAITING_RESPONSE,
         tierSuggested: TierLevel.LOW,
         legalExecutionMode: LegalExecutionMode.OPS_DIRECT,
         expectedPayoutWindow: '2030-01-01T00:00:00.000Z',
@@ -143,7 +170,7 @@ async function main() {
       data: {
         tenantId: tenant.id,
         caseRef: 'CASE-GUARD-2',
-        status: CaseStatus.SUBMITTED,
+        status: CaseStatus.AWAITING_RESPONSE,
         tierSuggested: TierLevel.MEDIUM,
         assignedAttorneyId: attorney.id,
         legalExecutionMode: LegalExecutionMode.ATTORNEY_REQUIRED,
@@ -233,7 +260,7 @@ async function main() {
       data: {
         tenantId: tenant.id,
         caseRef: 'CASE-GUARD-NO-WINDOW',
-        status: CaseStatus.SUBMITTED,
+        status: CaseStatus.AWAITING_RESPONSE,
         tierSuggested: TierLevel.MEDIUM,
         assignedAttorneyId: attorney.id,
         legalExecutionMode: LegalExecutionMode.ATTORNEY_REQUIRED,
@@ -267,7 +294,7 @@ async function main() {
       data: {
         tenantId: tenant.id,
         caseRef: 'CASE-GUARD-NO-CLOSURE-REQUIRED',
-        status: CaseStatus.SUBMITTED,
+        status: CaseStatus.AWAITING_RESPONSE,
         tierSuggested: TierLevel.MEDIUM,
         assignedAttorneyId: attorney.id,
         legalExecutionMode: LegalExecutionMode.ATTORNEY_REQUIRED,
@@ -302,7 +329,7 @@ async function main() {
       data: {
         tenantId: tenant.id,
         caseRef: 'CASE-GUARD-OVERDUE',
-        status: CaseStatus.SUBMITTED,
+        status: CaseStatus.AWAITING_RESPONSE,
         tierSuggested: TierLevel.MEDIUM,
         expectedPayoutWindow: '2020-01-01T00:00:00.000Z'
       }

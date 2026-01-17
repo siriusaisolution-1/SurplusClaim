@@ -266,5 +266,26 @@ export const templateRegistry = new TemplateRegistry([
       due_date: { maxLength: 120, required: true },
       case_ref: { pattern: CASE_REF_PATTERN, required: true }
     }
+  },
+  {
+    id: 'submission_status_reminder',
+    version: 'v1',
+    name: 'Submission status reminder',
+    description: 'Reminder to follow up after a submission status update.',
+    channel: 'EMAIL',
+    riskLevel: 'LOW',
+    subject: '[{{case_ref}}] Reminder: follow-up needed after submission',
+    body: [
+      'Hello {{recipient_name}},',
+      'This is a reminder that case {{case_ref}} is {{status_label}}.',
+      'Please follow up as needed and reply to {{reply_to}} with any updates.'
+    ].join(' '),
+    variables: {
+      recipient_name: { pattern: /^[A-Za-z .'-]{2,80}$/, required: true },
+      recipient_email: { pattern: EMAIL_PATTERN, required: true },
+      reply_to: { pattern: EMAIL_PATTERN, required: true },
+      status_label: { maxLength: 120, required: true },
+      case_ref: { pattern: CASE_REF_PATTERN, required: true }
+    }
   }
 ]);

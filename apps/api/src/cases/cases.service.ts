@@ -101,13 +101,37 @@ const allowedTransitions: Record<CaseStatus, CaseStatus[]> = {
     CaseStatus.ON_HOLD,
     CaseStatus.ESCALATED
   ],
-  [CaseStatus.PACKAGE_READY]: [CaseStatus.SUBMITTED, CaseStatus.ON_HOLD, CaseStatus.ESCALATED],
-  [CaseStatus.SUBMITTED]: [CaseStatus.PAYOUT_CONFIRMED, CaseStatus.ON_HOLD, CaseStatus.ESCALATED],
+  [CaseStatus.PACKAGE_READY]: [
+    CaseStatus.SUBMITTED_BY_CLIENT,
+    CaseStatus.SUBMITTED_BY_PARTNER,
+    CaseStatus.ON_HOLD,
+    CaseStatus.ESCALATED
+  ],
+  [CaseStatus.SUBMITTED_BY_CLIENT]: [
+    CaseStatus.AWAITING_RESPONSE,
+    CaseStatus.ON_HOLD,
+    CaseStatus.ESCALATED
+  ],
+  [CaseStatus.SUBMITTED_BY_PARTNER]: [
+    CaseStatus.AWAITING_RESPONSE,
+    CaseStatus.ON_HOLD,
+    CaseStatus.ESCALATED
+  ],
+  [CaseStatus.AWAITING_RESPONSE]: [CaseStatus.PAYOUT_CONFIRMED, CaseStatus.ON_HOLD, CaseStatus.ESCALATED],
+  [CaseStatus.SUBMITTED]: [
+    CaseStatus.AWAITING_RESPONSE,
+    CaseStatus.PAYOUT_CONFIRMED,
+    CaseStatus.ON_HOLD,
+    CaseStatus.ESCALATED
+  ],
   [CaseStatus.PAYOUT_CONFIRMED]: [CaseStatus.CLOSED, CaseStatus.ON_HOLD, CaseStatus.ESCALATED],
   [CaseStatus.CLOSED]: [],
   [CaseStatus.ESCALATED]: [
     CaseStatus.DOCUMENT_COLLECTION,
     CaseStatus.PACKAGE_READY,
+    CaseStatus.SUBMITTED_BY_CLIENT,
+    CaseStatus.SUBMITTED_BY_PARTNER,
+    CaseStatus.AWAITING_RESPONSE,
     CaseStatus.SUBMITTED,
     CaseStatus.PAYOUT_CONFIRMED,
     CaseStatus.ON_HOLD
@@ -119,6 +143,9 @@ const allowedTransitions: Record<CaseStatus, CaseStatus[]> = {
     CaseStatus.CONSENT_SIGNED,
     CaseStatus.DOCUMENT_COLLECTION,
     CaseStatus.PACKAGE_READY,
+    CaseStatus.SUBMITTED_BY_CLIENT,
+    CaseStatus.SUBMITTED_BY_PARTNER,
+    CaseStatus.AWAITING_RESPONSE,
     CaseStatus.SUBMITTED,
     CaseStatus.PAYOUT_CONFIRMED,
     CaseStatus.ESCALATED
@@ -133,6 +160,21 @@ export class CasesService {
 
   getAllowedTransitions(status: CaseStatus): CaseStatus[] {
     return allowedTransitions[status] ?? [];
+  }
+
+  private normalizeSubmissionTarget(target: CaseStatus): CaseStatus {
+    if (target === CaseStatus.SUBMITTED) {
+      return CaseStatus.SUBMITTED_BY_PARTNER;
+    }
+    return target;
+  }
+
+  private isSubmissionEntryStatus(status: CaseStatus): boolean {
+    return (
+      status === CaseStatus.SUBMITTED_BY_CLIENT ||
+      status === CaseStatus.SUBMITTED_BY_PARTNER ||
+      status === CaseStatus.AWAITING_RESPONSE
+    );
   }
 
   private parseExpectedPayoutDate(window?: string | null) {
@@ -774,10 +816,11 @@ export class CasesService {
       throw new NotFoundException('Case not found');
     }
 
+    const normalizedToState = this.normalizeSubmissionTarget(input.toState);
     const allowed = this.getAllowedTransitions(caseRecord.status);
-    if (!allowed.includes(input.toState)) {
+    if (!allowed.includes(normalizedToState)) {
       throw new BadRequestException(
-        `Transition from ${caseRecord.status} to ${input.toState} is not allowed`
+        `Transition from ${caseRecord.status} to ${normalizedToState} is not allowed`
       );
     }
 
@@ -797,7 +840,7 @@ export class CasesService {
 
     const payoutState = await this.getPayoutState(tenantId, caseRecord.id);
     const payoutEvidence =
-      input.toState === CaseStatus.PAYOUT_CONFIRMED
+      normalizedToState === CaseStatus.PAYOUT_CONFIRMED
         ? await this.resolvePayoutEvidence(tenantId, caseRecord, payoutState.latest)
         : null;
     const locks = this.buildLocks(caseRecord, payoutState);
@@ -808,12 +851,12 @@ export class CasesService {
       CaseStatus.ESCALATED
     ];
 
-    if (locks.length > 0 && !lockBypassStates.includes(input.toState)) {
+    if (locks.length > 0 && !lockBypassStates.includes(normalizedToState)) {
       throw new BadRequestException(`Case locked: ${locks[0].message}`);
     }
 
     if (
-      [CaseStatus.DOCUMENT_COLLECTION, CaseStatus.PACKAGE_READY].includes(input.toState) &&
+      [CaseStatus.DOCUMENT_COLLECTION, CaseStatus.PACKAGE_READY].includes(normalizedToState) &&
       !(await prisma.consent.findFirst({
         where: { tenantId, caseRef, revokedAt: null }
       }))
@@ -822,14 +865,14 @@ export class CasesService {
     }
 
     if (
-      input.toState === CaseStatus.CLOSED &&
+      normalizedToState === CaseStatus.CLOSED &&
       effectiveLegalExecutionMode === LegalExecutionMode.ATTORNEY_REQUIRED &&
       !effectiveAssignedAttorneyId
     ) {
       throw new BadRequestException('Attorney assignment required before payout confirmation or closure');
     }
 
-    if (input.toState === CaseStatus.PAYOUT_CONFIRMED) {
+    if (normalizedToState === CaseStatus.PAYOUT_CONFIRMED) {
       if (!effectiveExpectedPayoutWindow || effectiveExpectedPayoutWindow.trim() === '') {
         throw new BadRequestException('Expected payout window must be set before payout confirmation');
       }
@@ -845,7 +888,7 @@ export class CasesService {
       });
     }
 
-    if (input.toState === CaseStatus.CLOSED) {
+    if (normalizedToState === CaseStatus.CLOSED) {
       if (locks.some((lock) => lock.code === 'UNCONFIRMED_PAYOUT')) {
         throw new BadRequestException('Cannot close case while payout is still unconfirmed');
       }
@@ -883,7 +926,7 @@ export class CasesService {
     }
 
     const updatedCase = await prisma.$transaction(async (tx) => {
-      const data: any = { status: input.toState };
+      const data: any = { status: normalizedToState };
 
       if (input.assignedAttorneyId !== undefined) {
         data.assignedAttorneyId = input.assignedAttorneyId;
@@ -911,11 +954,26 @@ export class CasesService {
           type: 'CASE_STATUS_CHANGED',
           payload: {
             from: caseRecord.status,
-            to: input.toState,
+            to: normalizedToState,
             reason: input.reason ?? null
           }
         }
       });
+
+      if (this.isSubmissionEntryStatus(normalizedToState)) {
+        await tx.caseEvent.create({
+          data: {
+            tenantId,
+            caseId: caseRecord.id,
+            caseRef: caseRecord.caseRef,
+            type: 'SUBMISSION_STATUS_ENTERED',
+            payload: {
+              from: caseRecord.status,
+              to: normalizedToState
+            }
+          }
+        });
+      }
 
       return record;
     });
@@ -928,10 +986,24 @@ export class CasesService {
       action: 'CASE_TRANSITION',
       metadata: {
         from: caseRecord.status,
-        to: input.toState,
+        to: normalizedToState,
         reason: input.reason ?? null
       }
     });
+
+    if (this.isSubmissionEntryStatus(normalizedToState)) {
+      await this.auditService.logAction({
+        tenantId,
+        actorId,
+        caseId: updatedCase.id,
+        caseRef: updatedCase.caseRef,
+        action: 'CASE_SUBMISSION_STATUS_ENTERED',
+        metadata: {
+          from: caseRecord.status,
+          to: normalizedToState
+        }
+      });
+    }
 
     return {
       ...updatedCase,
@@ -1016,7 +1088,12 @@ export class CasesService {
       locks: await this.getCaseLocks(tenantId, caseRecord),
       reminderHistory: events
         .filter((event) =>
-          ['DEADLINE_REMINDER_SCHEDULED', 'DEADLINE_REMINDER_SENT'].includes(event.type)
+          [
+            'DEADLINE_REMINDER_SCHEDULED',
+            'DEADLINE_REMINDER_SENT',
+            'SUBMISSION_REMINDER_SCHEDULED',
+            'SUBMISSION_REMINDER_SENT'
+          ].includes(event.type)
         )
         .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()),
       nextDeadline: this.pickNextDeadline(this.extractProceduralDeadlines(caseRecord.metadata as any))

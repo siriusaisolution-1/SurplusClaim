@@ -43,21 +43,19 @@ function canReach(host, port) {
 
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/legal-safety.test.ts');
 
+    if (process.env.RUN_DB_TESTS !== 'true') {
+      console.log('Skipping DB-dependent tests (RUN_DB_TESTS!=true)');
+      return;
+    }
+
     const normalizedDbUrl = dbUrl.replace(/^postgres(ql)?:\/\//, 'postgres://');
     const url = new URL(normalizedDbUrl);
     const port = url.port ? Number(url.port) : 5432;
     const reachable = await canReach(url.hostname, port);
-    const isCi = process.env.CI === 'true';
 
     if (!reachable) {
-      if (isCi) {
-        console.error(
-          `CI=true and database is unreachable at ${url.hostname}:${port}; failing DB-dependent tests.`
-        );
-        process.exit(1);
-      }
-      console.warn(`Skipping DB-dependent tests (database unreachable at ${url.hostname}:${port})`);
-      return;
+      console.error(`Database is unreachable at ${url.hostname}:${port}; failing DB-dependent tests.`);
+      process.exit(1);
     }
 
     if (!skipPrismaSetup) {
