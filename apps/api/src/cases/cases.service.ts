@@ -387,11 +387,12 @@ export class CasesService {
   }
 
   /*
-  PREVIOUS findByCaseRef (before this change):
+  FORENSIC OUTPUT (before change):
   async findByCaseRef(tenantId: string, caseRef: string) {
     const where: Prisma.CaseWhereInput = { tenantId, caseRef };
-    if (where.legalExecutionMode == null) {
-      delete where.legalExecutionMode;
+    const modeToExclude: LegalExecutionMode | undefined = undefined;
+    if (modeToExclude) {
+      where.legalExecutionMode = { not: modeToExclude };
     }
 
     try {
@@ -491,13 +492,17 @@ export class CasesService {
       assignedAttorney
     } as any;
   }
+
+  Call sites (no optional mode passed):
+  - const caseRecord = await this.findByCaseRef(tenantId, caseRef); (apps/api/src/cases/cases.service.ts:719)
+  - const caseRecord = await this.findByCaseRef(tenantId, caseRef); (apps/api/src/cases/cases.service.ts:795)
+  - const caseRecord = await this.findByCaseRef(tenantId, caseRef); (apps/api/src/cases/cases.service.ts:925)
+  - const caseRecord = await this.findByCaseRef(tenantId, caseRef); (apps/api/src/cases/cases.service.ts:1137)
+  - const caseRecord = await this.findByCaseRef(tenantId, caseRef); (apps/api/src/cases/cases.service.ts:1177)
+  - const caseRecord = await this.findByCaseRef(tenantId, caseRef); (apps/api/src/cases/cases.service.ts:1216)
   */
   async findByCaseRef(tenantId: string, caseRef: string) {
     const where: Prisma.CaseWhereInput = { tenantId, caseRef };
-    const modeToExclude: LegalExecutionMode | undefined = undefined;
-    if (modeToExclude) {
-      where.legalExecutionMode = { not: modeToExclude };
-    }
 
     try {
       const caseRecord = await prisma.case.findFirst({

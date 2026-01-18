@@ -97,12 +97,39 @@ async function main() {
 
     await transition('DOCUMENT_COLLECTION');
 
-    // Controller uses: @UseInterceptors(FileInterceptor('file', { storage: multer.memoryStorage(), ... }))
+    /*
+    DocumentsController upload route:
+    @Post('upload')
+    @UseInterceptors(
+      FileInterceptor('file', {
+        storage: multer.memoryStorage(),
+        limits: { fileSize: MAX_UPLOAD_BYTES },
+        fileFilter: uploadFileFilter
+      } satisfies MulterOptions)
+    )
+    async upload(
+      @Param('caseRef') caseRef: string,
+      @UploadedFile() file: Express.Multer.File,
+      @Body('docType') docType: string | undefined,
+      @CurrentUser() user: any
+    ) { ... }
+
+    Forensic uploadDocument helper (before change):
     const uploadDocument = async (docType: string, filename: string, label: string) => {
       const fileBuffer = Buffer.from(
-        `%PDF-1.4\nDummy content for ${label}\n1 0 obj\n<<>>\nendobj\n%%EOF\n`,
+        `%PDF-1.4\\nDummy content for ${label}\\n1 0 obj\\n<<>>\\nendobj\\n%%EOF\\n`,
         'utf8'
       );
+      return request(server)
+        .post(`/cases/${caseRef}/documents/upload`)
+        .set(authHeader)
+        .field('docType', docType)
+        .attach('file', fileBuffer, { filename, contentType: 'application/pdf' })
+        .expect(201);
+    };
+    */
+    const uploadDocument = async (docType: string, filename: string, label: string) => {
+      const fileBuffer = Buffer.from(`%PDF-1.4\nDummy pdf for ${label}\n%%EOF\n`, 'utf8');
       return request(server)
         .post(`/cases/${caseRef}/documents/upload`)
         .set(authHeader)
