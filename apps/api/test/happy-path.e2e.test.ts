@@ -129,12 +129,12 @@ async function main() {
     };
     */
     const uploadDocument = async (docType: string, filename: string, label: string) => {
-      const fileBuffer = Buffer.from(`hello-${label}`, 'utf8');
+      const fileBuffer = Buffer.from('hello', 'utf8');
       return request(server)
         .post(`/cases/${caseRef}/documents/upload`)
         .set(authHeader)
         .field('docType', docType)
-        .attach('file', fileBuffer, { filename, contentType: 'application/pdf' })
+        .attach('file', fileBuffer, { filename: 'test.pdf', contentType: 'application/pdf' })
         .expect(201);
     };
 
