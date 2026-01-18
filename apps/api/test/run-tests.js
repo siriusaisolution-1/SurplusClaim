@@ -44,6 +44,10 @@ function canReach(host, port) {
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/legal-safety.test.ts');
 
     if (process.env.RUN_DB_TESTS !== 'true') {
+      if (process.env.CI === 'true') {
+        console.error('RUN_DB_TESTS must be true in CI to execute DB-dependent tests.');
+        process.exit(1);
+      }
       console.log('Skipping DB-dependent tests (RUN_DB_TESTS!=true)');
       return;
     }
@@ -68,6 +72,7 @@ function canReach(host, port) {
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/case-transition-guard.test.ts');
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/connector-runs.test.ts');
     run('pnpm exec ts-node --project ./tsconfig.test.json ./test/happy-path.e2e.test.ts');
+    run('pnpm exec ts-node --project ./tsconfig.test.json ./test/e2e-happy-path.test.ts');
     if (process.env.RUN_API_INTEGRATION === 'true') {
       run('pnpm exec ts-node --project ./tsconfig.test.json ./test/integration.test.ts');
     } else {

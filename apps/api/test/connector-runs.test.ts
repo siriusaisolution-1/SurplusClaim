@@ -1,24 +1,35 @@
 import assert from 'node:assert';
 
-import { ConnectorRunStatus, PrismaClient } from '@prisma/client';
-import { ConnectorOrchestrator, ConnectorRegistry, ConnectorScrapedItem, InMemoryConnectorStateStore } from '@surplus/connectors';
+import { ConnectorRunStatus, Prisma, PrismaClient } from '@prisma/client';
+import {
+  ConnectorConfig,
+  ConnectorOrchestrator,
+  ConnectorRegistry,
+  ConnectorScrapedItem,
+  InMemoryConnectorStateStore,
+  ParsingMode,
+  ScrapydClient
+} from '@surplus/connectors';
 import { generateCaseRef } from '@surplus/shared';
 
 import { prisma } from '../src/prisma/prisma.client';
 
-class FakeScrapydClient {
+class FakeScrapydClient extends ScrapydClient {
   private jobCounter = 0;
   public readonly receivedCursors: Array<string | undefined> = [];
 
-  constructor(private batches: ConnectorScrapedItem[][]) {}
+  constructor(private batches: ConnectorScrapedItem[][]) {
+    super('http://scrapyd.test');
+  }
 
-  async scheduleSpider(_spider: string, args?: { cursor?: string }) {
+  async scheduleSpider(_spider: string, settings: Record<string, unknown> = {}) {
     this.jobCounter += 1;
-    this.receivedCursors.push(args?.cursor);
+    const cursor = typeof settings.cursor === 'string' ? settings.cursor : undefined;
+    this.receivedCursors.push(cursor);
     return `job-${this.jobCounter}`;
   }
 
-  async fetchItems() {
+  async fetchItems(_jobId: string) {
     return this.batches.shift() ?? [];
   }
 }
@@ -90,7 +101,10 @@ class PrismaConnectorRunStore {
     });
   }
 
-  async persistCursor(connector: { spiderName: string; key: { state: string; county_code: string } }, cursor: string | null) {
+  async persistCursor(
+    connector: { spiderName: string; key: { state: string; county_code: string } },
+    cursor: string | null
+  ) {
     await this.client.connectorCursor.upsert({
       where: {
         tenantId_connectorId_state_countyCode: {
@@ -100,13 +114,13 @@ class PrismaConnectorRunStore {
           countyCode: connector.key.county_code
         }
       },
-      update: { cursor: cursor ?? null },
+      update: { cursor: cursor ?? Prisma.DbNull },
       create: {
         tenantId: this.tenantId,
         connectorId: this.connectorId(connector),
         state: connector.key.state,
         countyCode: connector.key.county_code,
-        cursor: cursor ?? null
+        cursor: cursor ?? Prisma.DbNull
       }
     });
   }
@@ -116,12 +130,12 @@ async function run() {
   await prisma.$executeRawUnsafe('TRUNCATE TABLE "ConnectorRun", "ConnectorCursor", "Tenant" CASCADE;');
   const tenant = await prisma.tenant.create({ data: { name: 'Connector Test Tenant' } });
 
-  const connector = {
+  const connector: ConnectorConfig = {
     key: { state: 'GA', county_code: 'FULTON' },
     spiderName: 'ga_fulton_overages',
     watchUrls: ['https://fultoncountyga.gov/overages'],
     scheduleInterval: 60,
-    parsingMode: 'normalized'
+    parsingMode: 'normalized' satisfies ParsingMode
   };
 
   const caseRef = generateCaseRef({ state: 'GA', countycode: 'FULTON', date: '2024-01-01' });

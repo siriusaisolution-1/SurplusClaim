@@ -386,11 +386,128 @@ export class CasesService {
     };
   }
 
+  /*
+  FORENSIC OUTPUT (before change):
   async findByCaseRef(tenantId: string, caseRef: string) {
+    const where: Prisma.CaseWhereInput = { tenantId, caseRef };
+    const modeToExclude: LegalExecutionMode | undefined = undefined;
+    if (modeToExclude) {
+      where.legalExecutionMode = { not: modeToExclude };
+    }
+
     try {
       const caseRecord = await prisma.case.findFirst({
         // Legacy CI DBs can have NULL legalExecutionMode when migrations are skipped.
-        where: { tenantId, caseRef, legalExecutionMode: { not: null } },
+        where,
+        include: { assignedReviewer: true, assignedAttorney: true }
+      });
+      if (caseRecord) {
+        return caseRecord;
+      }
+    } catch (error: any) {
+      const message = error?.message ?? '';
+
+      if (message.includes('LegalExecutionMode') && message.includes('null')) {
+        const rows = await prisma.$queryRaw<
+          Array<{
+            id: string;
+            tenantId: string;
+            caseRef: string;
+            status: CaseStatus;
+            tierSuggested: TierLevel;
+            tierConfirmed: TierLevel | null;
+            assignedReviewerId: string | null;
+            assignedAttorneyId: string | null;
+            legalExecutionMode: LegalExecutionMode | null;
+            expectedPayoutWindow: string | null;
+            closureConfirmationRequired: boolean;
+            metadata: Record<string, unknown> | null;
+            createdAt: Date;
+            updatedAt: Date;
+          }>
+        >(
+          Prisma.sql`SELECT * FROM "Case" WHERE "tenantId" = ${tenantId}::uuid AND "caseRef" = ${caseRef} LIMIT 1`
+        );
+
+        const rawCase = rows[0];
+        if (!rawCase) return null;
+
+        const [assignedReviewer, assignedAttorney] = await Promise.all([
+          rawCase.assignedReviewerId
+            ? prisma.user.findUnique({ where: { id: rawCase.assignedReviewerId } })
+            : Promise.resolve(null),
+          rawCase.assignedAttorneyId
+            ? prisma.attorney.findUnique({ where: { id: rawCase.assignedAttorneyId } })
+            : Promise.resolve(null)
+        ]);
+
+        return {
+          ...rawCase,
+          legalExecutionMode: rawCase.legalExecutionMode ?? LegalExecutionMode.ATTORNEY_REQUIRED,
+          assignedReviewer,
+          assignedAttorney
+        } as any;
+      }
+
+      throw error;
+    }
+
+    const rows = await prisma.$queryRaw<
+      Array<{
+        id: string;
+        tenantId: string;
+        caseRef: string;
+        status: CaseStatus;
+        tierSuggested: TierLevel;
+        tierConfirmed: TierLevel | null;
+        assignedReviewerId: string | null;
+        assignedAttorneyId: string | null;
+        legalExecutionMode: LegalExecutionMode | null;
+        expectedPayoutWindow: string | null;
+        closureConfirmationRequired: boolean;
+        metadata: Record<string, unknown> | null;
+        createdAt: Date;
+        updatedAt: Date;
+      }>
+    >(
+      Prisma.sql`SELECT * FROM "Case" WHERE "tenantId" = ${tenantId}::uuid AND "caseRef" = ${caseRef} LIMIT 1`
+    );
+
+    const rawCase = rows[0];
+    if (!rawCase) return null;
+
+    const [assignedReviewer, assignedAttorney] = await Promise.all([
+      rawCase.assignedReviewerId
+        ? prisma.user.findUnique({ where: { id: rawCase.assignedReviewerId } })
+        : Promise.resolve(null),
+      rawCase.assignedAttorneyId
+        ? prisma.attorney.findUnique({ where: { id: rawCase.assignedAttorneyId } })
+        : Promise.resolve(null)
+    ]);
+
+    return {
+      ...rawCase,
+      legalExecutionMode: rawCase.legalExecutionMode ?? LegalExecutionMode.ATTORNEY_REQUIRED,
+      assignedReviewer,
+      assignedAttorney
+    } as any;
+  }
+
+  Call sites (no optional mode passed):
+  - const caseRecord = await this.findByCaseRef(tenantId, caseRef); (apps/api/src/cases/cases.service.ts:719)
+  - const caseRecord = await this.findByCaseRef(tenantId, caseRef); (apps/api/src/cases/cases.service.ts:795)
+  - const caseRecord = await this.findByCaseRef(tenantId, caseRef); (apps/api/src/cases/cases.service.ts:925)
+  - const caseRecord = await this.findByCaseRef(tenantId, caseRef); (apps/api/src/cases/cases.service.ts:1137)
+  - const caseRecord = await this.findByCaseRef(tenantId, caseRef); (apps/api/src/cases/cases.service.ts:1177)
+  - const caseRecord = await this.findByCaseRef(tenantId, caseRef); (apps/api/src/cases/cases.service.ts:1216)
+  */
+  async findByCaseRef(tenantId: string, caseRef: string) {
+    const where: Prisma.CaseWhereInput = { tenantId, caseRef };
+
+    try {
+      const caseRecord = await prisma.case.findFirst({
+        // Legacy CI DBs can have NULL legalExecutionMode when migrations are skipped.
+        where,
         include: { assignedReviewer: true, assignedAttorney: true }
       });
       if (caseRecord) {
