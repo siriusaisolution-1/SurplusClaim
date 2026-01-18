@@ -9,6 +9,8 @@ import { AppModule } from '../src/app.module';
 import { hashPasswordForStorage } from '../src/auth/password.util';
 import { prisma } from '../src/prisma/prisma.client';
 
+const DOCUMENT_UPLOAD_FILE_FIELD = 'file';
+
 async function bootstrapApp(): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = moduleRef.createNestApplication();
@@ -110,13 +112,18 @@ async function main() {
         .post(`/cases/${caseRef}/documents/upload`)
         .set(authHeader)
         .field('docType', docType)
-        .attach('file', Buffer.concat([minimalPdfBuffer, Buffer.from(`% ${label}\n`)]), {
+        .attach(DOCUMENT_UPLOAD_FILE_FIELD, Buffer.concat([minimalPdfBuffer, Buffer.from(`% ${label}\n`)]), {
           filename,
           contentType: 'application/pdf'
         })
         .expect(201);
 
     const claimantUpload = await uploadDocument('claimant_id', 'claimant-id.pdf', 'claimant id');
+    assert.ok(
+      claimantUpload.body.document?.objectKey ||
+        (claimantUpload.body.document?.fileSize && claimantUpload.body.document?.sha256),
+      'Expected upload metadata (objectKey or fileSize/sha256)'
+    );
     assert.ok(claimantUpload.body.document?.sha256, 'Expected checksum');
     assert.ok((claimantUpload.body.document?.fileSize ?? 0) > 0, 'Expected non-empty upload');
 
