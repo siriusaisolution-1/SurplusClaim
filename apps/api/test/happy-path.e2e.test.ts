@@ -16,7 +16,10 @@ async function bootstrapApp(): Promise<INestApplication> {
 }
 
 function createPdfBuffer(label: string) {
-  return Buffer.from(`%PDF-1.4\n1 0 obj\n<< /Label (${label}) >>\nendobj\n%%EOF\n`, 'utf8');
+  return Buffer.from(
+    `%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Label (${label}) >>\nendobj\n%%EOF\n`,
+    'utf8'
+  );
 }
 
 async function main() {
@@ -94,13 +97,15 @@ async function main() {
 
     await transition('DOCUMENT_COLLECTION');
 
-    const uploadDocument = async (docType: string, filename: string, label: string) =>
-      request(server)
+    const uploadDocument = async (docType: string, filename: string, label: string) => {
+      const fileBuffer = createPdfBuffer(label);
+      return request(server)
         .post(`/cases/${caseRef}/documents/upload`)
         .set(authHeader)
         .field('docType', docType)
-        .attach('file', await createPdfBuffer(label), { filename, contentType: 'application/pdf' })
+        .attach('file', fileBuffer, { filename, contentType: 'application/pdf' })
         .expect(201);
+    };
 
     const claimantUpload = await uploadDocument('claimant_id', 'claimant-id.pdf', 'claimant id');
     assert.ok(claimantUpload.body.document?.sha256, 'Expected checksum');

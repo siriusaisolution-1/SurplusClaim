@@ -117,6 +117,10 @@ async function main() {
       `UPDATE "Case" SET "legalExecutionMode" = NULL WHERE "id" = '${caseWithoutLegalExecution.id}';`
     );
 
+    await assert.doesNotReject(async () => {
+      await casesService.findByCaseRef(tenant.id, caseWithoutLegalExecution.caseRef);
+    });
+
     const fetchedWithoutLegalExecution = await casesService.findByCaseRef(
       tenant.id,
       caseWithoutLegalExecution.caseRef

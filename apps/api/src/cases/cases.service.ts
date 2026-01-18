@@ -386,8 +386,13 @@ export class CasesService {
     };
   }
 
+  // findByCaseRef signature: async findByCaseRef(tenantId: string, caseRef: string)
   async findByCaseRef(tenantId: string, caseRef: string) {
     const where: Prisma.CaseWhereInput = { tenantId, caseRef };
+    // where.legalExecutionMode assignment: ensure it is never set to null/undefined.
+    if (where.legalExecutionMode == null) {
+      delete where.legalExecutionMode;
+    }
 
     try {
       const caseRecord = await prisma.case.findFirst({
