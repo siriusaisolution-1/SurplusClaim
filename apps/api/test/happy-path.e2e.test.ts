@@ -129,13 +129,15 @@ async function main() {
     };
     */
     const uploadDocument = async (docType: string, filename: string, label: string) => {
-      const fileBuffer = Buffer.from('hello', 'utf8');
-      return request(server)
+      const fileBuffer = Buffer.from('%PDF-1.4\nhello\n', 'utf8');
+      const response = await request(server)
         .post(`/cases/${caseRef}/documents/upload`)
         .set(authHeader)
         .field('docType', docType)
         .attach('file', fileBuffer, { filename: 'test.pdf', contentType: 'application/pdf' })
         .expect(201);
+      assert.ok(response.body.document?.sha256, 'Expected uploaded document sha256');
+      return response;
     };
 
     const claimantUpload = await uploadDocument('claimant_id', 'claimant-id.pdf', 'claimant id');
