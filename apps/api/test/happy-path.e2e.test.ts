@@ -97,8 +97,12 @@ async function main() {
 
     await transition('DOCUMENT_COLLECTION');
 
+    // Controller uses: @UseInterceptors(FileInterceptor('file', { storage: multer.memoryStorage(), ... }))
     const uploadDocument = async (docType: string, filename: string, label: string) => {
-      const fileBuffer = createPdfBuffer(label);
+      const fileBuffer = Buffer.from(
+        `%PDF-1.4\nDummy content for ${label}\n1 0 obj\n<<>>\nendobj\n%%EOF\n`,
+        'utf8'
+      );
       return request(server)
         .post(`/cases/${caseRef}/documents/upload`)
         .set(authHeader)
