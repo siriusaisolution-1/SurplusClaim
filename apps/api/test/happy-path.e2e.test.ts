@@ -16,7 +16,7 @@ async function bootstrapApp(): Promise<INestApplication> {
 }
 
 function createPdfBuffer(label: string) {
-  return Buffer.from(`%PDF-1.4\n${label}\n%%EOF`, 'utf8');
+  return Buffer.from(`%PDF-1.4\n1 0 obj\n<< /Label (${label}) >>\nendobj\n%%EOF\n`, 'utf8');
 }
 
 async function main() {

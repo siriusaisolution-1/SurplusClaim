@@ -388,10 +388,6 @@ export class CasesService {
 
   async findByCaseRef(tenantId: string, caseRef: string) {
     const where: Prisma.CaseWhereInput = { tenantId, caseRef };
-    const legalExecutionModeToExclude: LegalExecutionMode | null = null;
-    if (legalExecutionModeToExclude) {
-      where.legalExecutionMode = { not: legalExecutionModeToExclude };
-    }
 
     try {
       const caseRecord = await prisma.case.findFirst({
