@@ -129,7 +129,7 @@ async function main() {
     };
     */
     const uploadDocument = async (docType: string, filename: string, label: string) => {
-      const fileBuffer = Buffer.from(`%PDF-1.4\nDummy pdf for ${label}\n%%EOF\n`, 'utf8');
+      const fileBuffer = Buffer.from(`hello-${label}`, 'utf8');
       return request(server)
         .post(`/cases/${caseRef}/documents/upload`)
         .set(authHeader)
