@@ -31,6 +31,8 @@ async function createPdfBuffer(label: string) {
 async function main() {
   await prisma.$executeRawUnsafe('TRUNCATE TABLE "Tenant" CASCADE;');
 
+  const minimalPdfBuffer = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n');
+
   const tenant = await prisma.tenant.create({ data: { name: 'Happy Path Tenant' } });
   const admin = await prisma.user.create({
     data: { tenantId: tenant.id, email: 'admin@happy.test', fullName: 'Happy Admin', role: 'TENANT_ADMIN', passwordHash: hashPasswordForStorage('PasswordAdmin1!') }
@@ -108,11 +110,15 @@ async function main() {
         .post(`/cases/${caseRef}/documents/upload`)
         .set(authHeader)
         .field('docType', docType)
-        .attach('file', await createPdfBuffer(label), { filename, contentType: 'application/pdf' })
+        .attach('file', Buffer.concat([minimalPdfBuffer, Buffer.from(`% ${label}\n`)]), {
+          filename,
+          contentType: 'application/pdf'
+        })
         .expect(201);
 
     const claimantUpload = await uploadDocument('claimant_id', 'claimant-id.pdf', 'claimant id');
     assert.ok(claimantUpload.body.document?.sha256, 'Expected checksum');
+    assert.ok((claimantUpload.body.document?.fileSize ?? 0) > 0, 'Expected non-empty upload');
 
     const checklistItems = claimantUpload.body.checklist?.items ?? [];
     const claimantItem = checklistItems.find((item: any) => item.id === 'claimant_id');
