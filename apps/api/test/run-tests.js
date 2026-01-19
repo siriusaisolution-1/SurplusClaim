@@ -5,6 +5,17 @@ const dbUrl = process.env.DATABASE_URL ?? 'postgresql://surplus:surplus@localhos
 process.env.DATABASE_URL = dbUrl;
 const skipPrismaSetup = process.env.SKIP_PRISMA_DB_SETUP === 'true';
 
+if (
+  process.env.CI === 'true' &&
+  process.env.RUN_DB_TESTS === 'true' &&
+  process.env.SKIP_PRISMA_DB_SETUP === 'true'
+) {
+  console.error(
+    'Invalid CI configuration: RUN_DB_TESTS=true requires SKIP_PRISMA_DB_SETUP=false to run Prisma setup.'
+  );
+  process.exit(1);
+}
+
 const baseEnv = {
   ...process.env,
   TS_NODE_PROJECT: './tsconfig.test.json'
