@@ -393,6 +393,9 @@ export class CasesService {
         include: { assignedReviewer: true, assignedAttorney: true }
       });
       if (caseRecord) {
+        if (caseRecord.legalExecutionMode == null) {
+          caseRecord.legalExecutionMode = LegalExecutionMode.ATTORNEY_REQUIRED;
+        }
         return caseRecord;
       }
     } catch (error: any) {
