@@ -4,7 +4,12 @@ import { BadRequestException } from '@nestjs/common';
 import type { Request } from 'express';
 import type { MulterOptions } from '@nestjs/platform-express/multer/interfaces/multer-options.interface';
 
-export const MAX_UPLOAD_BYTES = parseInt(process.env.MAX_UPLOAD_BYTES ?? '5242880', 10); // 5 MiB default
+const DEFAULT_MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const parsedMaxUploadBytes = Number.parseInt(process.env.MAX_UPLOAD_BYTES ?? '', 10);
+export const MAX_UPLOAD_BYTES =
+  Number.isNaN(parsedMaxUploadBytes) || parsedMaxUploadBytes <= 0
+    ? DEFAULT_MAX_UPLOAD_BYTES
+    : parsedMaxUploadBytes;
 export const ALLOWED_MIME_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
 const ALLOWED_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg'];
 

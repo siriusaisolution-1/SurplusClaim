@@ -389,8 +389,7 @@ export class CasesService {
   async findByCaseRef(tenantId: string, caseRef: string) {
     try {
       const caseRecord = await prisma.case.findFirst({
-        // Legacy CI DBs can have NULL legalExecutionMode when migrations are skipped.
-        where: { tenantId, caseRef, legalExecutionMode: { not: null } },
+        where: { tenantId, caseRef },
         include: { assignedReviewer: true, assignedAttorney: true }
       });
       if (caseRecord) {
