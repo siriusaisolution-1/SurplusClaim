@@ -46,9 +46,6 @@ jobs:
       JWT_ACCESS_SECRET: test-secret
       NODE_ENV: test
 
-      # Enable Prisma drift check in CI.
-      PRISMA_DRIFT_CHECK: "true"
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -89,11 +86,10 @@ jobs:
         working-directory: apps/api
         run: pnpm exec prisma migrate deploy --schema prisma/schema.prisma
 
-      - name: Prisma schema vs migrations drift check (optional)
-        if: env.PRISMA_DRIFT_CHECK == 'true'
+      - name: Prisma schema vs migrations drift check
         working-directory: apps/api
         run: |
-          echo "Prisma drift check enabled; comparing prisma/schema.prisma to prisma/migrations using SHADOW_DATABASE_URL."
+          echo "Running Prisma drift check against SHADOW_DATABASE_URL to compare prisma/schema.prisma to prisma/migrations."
           if pnpm exec prisma migrate diff --from-schema-datamodel=./prisma/schema.prisma --to-migrations=./prisma/migrations --shadow-database-url="${SHADOW_DATABASE_URL}" --exit-code; then
             echo "Prisma schema matches migrations."
           else
@@ -111,6 +107,7 @@ jobs:
         env:
           SKIP_PRISMA_DB_SETUP: "true"
           RUN_API_INTEGRATION: "true"
+          RUN_DB_TESTS: "true"
         run: pnpm test
 
       - name: Build
