@@ -1,5 +1,7 @@
 import assert from 'node:assert';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import PDFDocument from 'pdfkit';
@@ -30,8 +32,9 @@ async function createPdfBuffer(label: string) {
 
 async function main() {
   await prisma.$executeRawUnsafe('TRUNCATE TABLE "Tenant" CASCADE;');
-
-  const minimalPdfBuffer = Buffer.from('%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF\n');
+  const fixturePath = path.join(__dirname, 'fixtures', 'minimal.pdf');
+  const fixtureStat = fs.statSync(fixturePath);
+  assert.ok(fixtureStat.size > 0, 'Expected non-empty fixture file');
 
   const tenant = await prisma.tenant.create({ data: { name: 'Happy Path Tenant' } });
   const admin = await prisma.user.create({
@@ -105,18 +108,18 @@ async function main() {
 
     await transition('DOCUMENT_COLLECTION');
 
-    const uploadDocument = async (docType: string, filename: string, label: string) =>
+    const uploadDocument = async (docType: string, filename: string) =>
       request(server)
         .post(`/cases/${caseRef}/documents/upload`)
         .set(authHeader)
         .field('docType', docType)
-        .attach('file', Buffer.concat([minimalPdfBuffer, Buffer.from(`% ${label}\n`)]), {
+        .attach('file', fixturePath, {
           filename,
           contentType: 'application/pdf'
         })
         .expect(201);
 
-    const claimantUpload = await uploadDocument('claimant_id', 'claimant-id.pdf', 'claimant id');
+    const claimantUpload = await uploadDocument('claimant_id', 'claimant-id.pdf');
     assert.ok(claimantUpload.body.document?.sha256, 'Expected checksum');
     assert.ok((claimantUpload.body.document?.fileSize ?? 0) > 0, 'Expected non-empty upload');
 
@@ -136,8 +139,8 @@ async function main() {
     assert.strictEqual(incompletePackage.body.message, 'Checklist incomplete');
     assert.ok(incompletePackage.body.missing?.length > 0);
 
-    await uploadDocument('proof_of_ownership', 'proof-of-ownership.pdf', 'proof');
-    await uploadDocument('w9', 'w9.pdf', 'w9');
+    await uploadDocument('proof_of_ownership', 'proof-of-ownership.pdf');
+    await uploadDocument('w9', 'w9.pdf');
 
     const packageResponse = await request(server)
       .post(`/cases/${caseRef}/package/generate`)
