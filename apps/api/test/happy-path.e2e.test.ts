@@ -28,6 +28,12 @@ async function createPdfBuffer(label: string) {
   });
 }
 
+const expect = (value: number) => ({
+  toBeGreaterThan: (min: number) => {
+    assert.ok(value > min, `Expected ${value} to be greater than ${min}`);
+  }
+});
+
 async function main() {
   await prisma.$executeRawUnsafe('TRUNCATE TABLE "Tenant" CASCADE;');
 
@@ -104,16 +110,28 @@ async function main() {
     await transition('DOCUMENT_COLLECTION');
 
     const uploadDocument = async (docType: string, filename: string, label: string) => {
-      const pdfBuffer = Buffer.from(`test-pdf-${label}`);
-      return request(server)
+      const pdfBuffer = Buffer.from(`%PDF-1.4\n${label}\n`.repeat(10));
+      expect(pdfBuffer.length).toBeGreaterThan(0);
+      assert.ok(pdfBuffer.length >= 100, 'Expected PDF buffer to be at least 100 bytes');
+      const response = await request(server)
         .post(`/cases/${caseRef}/documents/upload`)
         .set(authHeader)
         .field('docType', docType)
         .attach('file', pdfBuffer, {
-          filename,
+          filename: 'e2e.pdf',
           contentType: 'application/pdf'
-        })
-        .expect(201);
+        });
+
+      if (response.status !== 201) {
+        console.error('Document upload failed', {
+          status: response.status,
+          text: response.text,
+          body: response.body
+        });
+      }
+
+      assert.strictEqual(response.status, 201);
+      return response;
     };
 
     const claimantUpload = await uploadDocument('claimant_id', 'claimant-id.pdf', 'claimant id');
