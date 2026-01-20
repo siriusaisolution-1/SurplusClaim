@@ -113,7 +113,7 @@ async function main() {
         .post(`/cases/${caseRef}/documents/upload`)
         .set(authHeader)
         .field('docType', docType)
-        .attach('file', fixturePath, {
+        .attach('file', path.join(__dirname, 'fixtures', 'minimal.pdf'), {
           filename,
           contentType: 'application/pdf'
         })

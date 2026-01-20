@@ -42,6 +42,7 @@ pip install -r services/scraper/requirements.txt
 ### Testing
 - **All JS/TS packages**: `pnpm test` (placeholder tests)
 - **Scraper tests**: `python -m pytest services/scraper/tests`
+- **CI modes**: See `docs/ci-modes.md` for environment flags that control CI behavior.
 
 ### Linting & Formatting
 - `pnpm lint`
