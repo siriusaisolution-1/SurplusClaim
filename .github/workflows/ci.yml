@@ -134,7 +134,6 @@ jobs:
 
       - name: Tests
         env:
-          SKIP_PRISMA_DB_SETUP: "true"
           RUN_API_INTEGRATION: "true"
           RUN_DB_TESTS: "true"
         run: pnpm test
