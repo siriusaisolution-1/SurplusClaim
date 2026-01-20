@@ -37,11 +37,23 @@ export function validateFileInput(file: UploadFile | undefined) {
   }
 }
 
+export function validateFileMeta(file: UploadFile | undefined) {
+  if (!file) {
+    throw new BadRequestException('No file provided');
+  }
+
+  const extension = path.extname(file.originalname).toLowerCase();
+
+  if (!ALLOWED_MIME_TYPES.includes(file.mimetype) || !ALLOWED_EXTENSIONS.includes(extension)) {
+    throw new BadRequestException('Invalid file type. Only PDF and image files are allowed');
+  }
+}
+
 export type MulterFileFilter = NonNullable<MulterOptions['fileFilter']>;
 
 export const uploadFileFilter: MulterFileFilter = (_req: Request, file, cb) => {
   try {
-    validateFileInput(file);
+    validateFileMeta(file);
     cb(null, true);
   } catch (error) {
     cb(error as Error, false);
