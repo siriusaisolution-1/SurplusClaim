@@ -130,7 +130,7 @@ async function run() {
     spiderName: 'ga_fulton_overages',
     watchUrls: ['https://fultoncountyga.gov/overages'],
     scheduleInterval: 60,
-    parsingMode: 'normalized' satisfies ParsingMode
+    parsingMode: 'normalized' as ParsingMode
   };
 
   const caseRef = generateCaseRef({ state: 'GA', countycode: 'FULTON', date: '2024-01-01' });
