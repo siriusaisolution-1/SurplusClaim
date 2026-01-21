@@ -389,7 +389,13 @@ export class CasesService {
   async findByCaseRef(tenantId: string, caseRef: string) {
     try {
       const caseRecord = await prisma.case.findFirst({
-        where: { tenantId, caseRef },
+        where: {
+          tenantId,
+          caseRef,
+          legalExecutionMode: {
+            in: [LegalExecutionMode.ATTORNEY_REQUIRED, LegalExecutionMode.OPS_DIRECT]
+          }
+        },
         include: { assignedReviewer: true, assignedAttorney: true }
       });
       if (caseRecord) {

@@ -1,24 +1,33 @@
 import assert from 'node:assert';
 
-import { ConnectorRunStatus, PrismaClient } from '@prisma/client';
-import { ConnectorOrchestrator, ConnectorRegistry, ConnectorScrapedItem, InMemoryConnectorStateStore } from '@surplus/connectors';
+import { ConnectorRunStatus, Prisma, PrismaClient } from '@prisma/client';
+import {
+  ConnectorOrchestrator,
+  ConnectorRegistry,
+  ConnectorScrapedItem,
+  InMemoryConnectorStateStore,
+  ParsingMode,
+  ScrapydClient
+} from '@surplus/connectors';
 import { generateCaseRef } from '@surplus/shared';
 
 import { prisma } from '../src/prisma/prisma.client';
 
-class FakeScrapydClient {
+class FakeScrapydClient extends ScrapydClient {
   private jobCounter = 0;
   public readonly receivedCursors: Array<string | undefined> = [];
 
-  constructor(private batches: ConnectorScrapedItem[][]) {}
+  constructor(private batches: ConnectorScrapedItem[][]) {
+    super('http://localhost:6800', 'test');
+  }
 
-  async scheduleSpider(_spider: string, args?: { cursor?: string }) {
+  override async scheduleSpider(_spider: string, settings: Record<string, unknown> = {}) {
     this.jobCounter += 1;
-    this.receivedCursors.push(args?.cursor);
+    this.receivedCursors.push(settings.cursor as string | undefined);
     return `job-${this.jobCounter}`;
   }
 
-  async fetchItems() {
+  override async fetchItems(_jobId: string) {
     return this.batches.shift() ?? [];
   }
 }
@@ -58,7 +67,7 @@ class PrismaConnectorRunStore {
         countyCode: connector.key.county_code,
         status: ConnectorRunStatus[input.status.toUpperCase() as keyof typeof ConnectorRunStatus],
         startedAt: input.startedAt,
-        cursor: input.cursor ?? undefined,
+        cursor: input.cursor === undefined ? undefined : input.cursor ?? Prisma.DbNull,
         attemptCount: input.attemptCount ?? 1
       },
       select: { id: true, attemptCount: true }
@@ -83,8 +92,8 @@ class PrismaConnectorRunStore {
         status: ConnectorRunStatus[update.status.toUpperCase() as keyof typeof ConnectorRunStatus],
         finishedAt: update.finishedAt ?? undefined,
         errorMessage: update.errorMessage ?? undefined,
-        cursor: update.cursor ?? undefined,
-        stats: update.stats ?? undefined,
+        cursor: update.cursor === undefined ? undefined : update.cursor ?? Prisma.DbNull,
+        stats: update.stats === undefined ? undefined : update.stats ?? Prisma.DbNull,
         attemptCount: update.attemptCount ?? undefined
       }
     });
@@ -100,13 +109,13 @@ class PrismaConnectorRunStore {
           countyCode: connector.key.county_code
         }
       },
-      update: { cursor: cursor ?? null },
+      update: { cursor: cursor ?? Prisma.DbNull },
       create: {
         tenantId: this.tenantId,
         connectorId: this.connectorId(connector),
         state: connector.key.state,
         countyCode: connector.key.county_code,
-        cursor: cursor ?? null
+        cursor: cursor ?? Prisma.DbNull
       }
     });
   }
@@ -121,7 +130,7 @@ async function run() {
     spiderName: 'ga_fulton_overages',
     watchUrls: ['https://fultoncountyga.gov/overages'],
     scheduleInterval: 60,
-    parsingMode: 'normalized'
+    parsingMode: 'normalized' satisfies ParsingMode
   };
 
   const caseRef = generateCaseRef({ state: 'GA', countycode: 'FULTON', date: '2024-01-01' });
