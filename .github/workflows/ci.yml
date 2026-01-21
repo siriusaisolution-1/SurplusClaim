@@ -45,6 +45,7 @@ jobs:
       SHADOW_DATABASE_URL: postgresql://surplus:surplus@localhost:5433/surplus_shadow
       JWT_ACCESS_SECRET: test-secret
       NODE_ENV: test
+      RUN_DB_TESTS: "true"
 
       # Enable Prisma drift check in CI.
       PRISMA_DRIFT_CHECK: "true"
@@ -68,26 +69,37 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Wait for Postgres
+      - name: Guard DATABASE_URL for DB tests
+        if: env.RUN_DB_TESTS == 'true'
+        shell: bash
+        run: |
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "DATABASE_URL must be set when RUN_DB_TESTS=true." >&2
+            exit 1
+          fi
+
+      - name: Wait for Postgres (pg_isready)
+        if: env.RUN_DB_TESTS == 'true'
         shell: bash
         run: |
           echo "Waiting for Postgres on localhost:5432..."
           for i in {1..30}; do
-            if (echo > /dev/tcp/localhost/5432) >/dev/null 2>&1; then
-              echo "Postgres is reachable."
+            if pg_isready -h localhost -p 5432 -U surplus; then
+              echo "Postgres is ready."
               exit 0
             fi
             sleep 1
           done
-          echo "Postgres did not become reachable on localhost:5432 within 30 seconds." >&2
+          echo "Postgres did not become ready on localhost:5432 within 30 seconds." >&2
           exit 1
 
       - name: Lint
         run: pnpm lint
 
-      - name: Prisma migrate deploy
+      - name: Prisma migrate deploy (DB tests)
+        if: env.RUN_DB_TESTS == 'true'
         working-directory: apps/api
-        run: pnpm exec prisma migrate deploy --schema prisma/schema.prisma
+        run: pnpm exec prisma migrate deploy
 
       - name: Prisma schema vs migrations drift check (optional)
         if: env.PRISMA_DRIFT_CHECK == 'true'
@@ -109,7 +121,8 @@ jobs:
 
       - name: Tests
         env:
-          SKIP_PRISMA_DB_SETUP: "true"
+          SKIP_PRISMA_DB_SETUP: "false"
+          RUN_DB_TESTS: "true"
           RUN_API_INTEGRATION: "true"
         run: pnpm test
 
